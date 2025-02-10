@@ -1,0 +1,102 @@
+<?xml version='1.0'?>
+<!-- <?xml-stylesheet type="text/xsl" href="{{accessURL}}static/xsl/Capabilities.xsl"?> -->
+<vosi:capabilities
+  xmlns:vosi="http://www.ivoa.net/xml/VOSICapabilities/v1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:vs="http://www.ivoa.net/xml/VODataService/v1.1"  
+  xsi:schemaLocation="http://www.ivoa.net/xml/VOSICapabilities/v1.0 http://vamdc.eu/downloads/xml/VOSI-capabilities-1.0.xsd
+  http://www.ivoa.net/xml/VODataService/v1.1 http://www.ivoa.net/xml/VODataService/v1.1"
+  >
+<capability>
+    <interface xsi:type="vs:ParamHTTP" role="std">
+      <accessURL use="full">
+        {{accessURL}}capabilities
+      </accessURL>
+    </interface>
+  </capability>
+  <capability>
+    <interface xsi:type="vs:ParamHTTP" role="std">
+      <accessURL use="full">
+        {{accessURL}}availability
+      </accessURL>
+    </interface>
+  </capability>
+  <capability standardID="ivo://ivoa.net/std/SLAP#{species}-2.0">
+    <interface xsi:type="vs:ParamHTTP" role="std" version="2.0">
+      <accessURL>
+        {{accessURL}}species
+      </accessURL>
+    </interface>
+  </capability>
+  
+  
+  <capability standardID="ivo://ivoa.net/std/SLAP#{lines}-2.0">
+    <interface role="std" version="2.0" xsi:type="vs:ParamHTTP">
+      <accessURL use="base">{{accessURL}}lines?</accessURL>
+      <queryType>GET</queryType>
+      <resultType>application/x-votable+xml</resultType>
+      <param use="required" std="true">
+        <name>WAVELENGTH</name>
+        <description>wavelength in the vacuum of the transition originating in the line</description>
+        <unit>m</unit>
+        <ucd>em.wl</ucd>
+        <utype>ssldm:Line.wavelength.value</utype>
+        <dataType arraysize="2">real</dataType>
+      </param>
+
+      <param use="optional" std="true">
+        <name>MAXREC</name>
+        <description>parameter used by the client to limit the number or records in the response</description>
+        <dataType>int</dataType>
+      </param>
+      <param use="optional" std="true">
+        <name>RESPONSEFORMAT</name>
+        <description>parameter used by the client to specify the format of the response, default value is application/x-votable+xml
+        </description>
+        <dataType>string</dataType>
+      </param>
+
+      {% if "ioncharge" in restrictables %}
+      <param std="true">
+        <name>ION_CHARGE</name>
+        <description></description>
+        <ucd>phys.atmol.ionization</ucd>
+        <utype>ssldm:Line.lowerLevel.element.ionCharge</utype>
+        <dataType arraysize="2">integer</dataType>
+      </param>      
+      {% endif %}
+      {% if "lower.StateEnergy" in restrictables %}
+      <param std="true">
+        <name>LOWER_LEVEL_ENERGY</name>
+        <description></description>
+        <ucd>phys.energy;phys.atmol.level</ucd>        
+        <utype>ssldm:Line.lowerLevel.energy.value</utype>
+        <unit>J</unit>
+        <dataType arraysize="2">real</dataType>
+      </param>      
+      {% endif %}
+      {% if "upper.StateEnergy" in restrictables %}
+      <param std="true">
+        <name>UPPER_LEVEL_ENERGY</name>
+        <description></description>
+        <ucd>phys.energy;phys.atmol.level</ucd>        
+        <utype>ssldm:Line.upperLevel.energy.value</utype>
+        <unit>J</unit>
+        <dataType arraysize="2">real</dataType>
+      </param>      
+      {% endif %}
+      {% if "atomsymbol" in restrictables or "moleculechemicalname" in restrictables %}
+      <param std="true">
+        <name>CHEMICAL_ELEMENT</name>
+        <description></description>
+        <ucd>phys.atmol.element</ucd>
+        <utype>ssldm:Line.lowerLevel.element.name</utype>
+        <dataType>string</dataType>
+      </param>
+      {% endif %}
+    </interface>   
+  </capability>  
+  
+  
+
+</vosi:capabilities>

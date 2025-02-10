@@ -57,19 +57,22 @@ REQUESTABLES = [req.lower() for req in [\
 
 # This turns a 404 "not found" error into a TAP error-document
 def tapNotFoundError(request, exception):
-    text = 'Resource not found: %s'%request.path;
+    text = 'Resource not found: %s'%request.path
     document = loader.get_template('tap/TAP-error-document.xml').render({"error_message_text" : text})
-    return HttpResponse(document, status=404, content_type='text/xml');
+    return HttpResponse(document, status=404, content_type='text/xml')
 
 # This turns a 500 "internal server error" into a TAP error-document
 def tapServerError(request=None, status=500, errmsg=''):
     text = 'Error in TAP service: %s'%errmsg
     document = loader.get_template('tap/TAP-error-document.xml').render({"error_message_text" : text})
-    return HttpResponse(document, status=status, content_type='text/xml');
+    return HttpResponse(document, status=status, content_type='text/xml')
 
 def getBaseURL(request):
-    return getattr(settings, 'DEPLOY_URL', None) or \
+    print("getBaseURL")
+    result = getattr(settings, 'DEPLOY_URL', None) or \
         'http://' + request.get_host() + request.path.split('/tap',1)[0] + '/tap/'
+    print(result)
+    return result
 
 def getFormatLastModified(lastmodified):
     return http_date(time.mktime(lastmodified.timetuple()))

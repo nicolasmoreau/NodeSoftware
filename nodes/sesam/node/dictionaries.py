@@ -106,6 +106,15 @@ RESTRICTABLES = {\
 'RadTransProbabilityA':'transition_probability',
 }
 
+SLAP_PARAMETERS = {\
+    "WAVELENGTH" : "wavelength in the vacuum of the transition originating in the line", 
+    "MAXREC" : "", 
+    "ION_CHARGE" : "", 
+    "LOWER_LEVEL_ENERGY" : "", 
+    "UPPER_LEVEL_ENERGY" : "", 
+    "CHEMICAL_ELEMENT" : ""
+}
+
 PREFIXES = {\
 #'lower.StateEnergy':'lowerstate__energy',
 #'upper.StateEnergy':'upperstate__energy',

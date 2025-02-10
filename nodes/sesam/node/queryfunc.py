@@ -28,7 +28,7 @@ else: LAST_MODIFIED = None
 
 
 
-def setupResults(sql):
+def setupResults(sql, limit=None):
 	"""		
 		Return results for request
 		@type  sql: string
@@ -46,7 +46,7 @@ def setupResults(sql):
 		result = setupSources()
 	# all other requests
 	else:		
-		result = setupVssRequest(sql)			
+		result = setupVssRequest(sql, limit)			
 
 	if isinstance(result, util_models.Result) :
 		return result.getResult()
@@ -93,7 +93,7 @@ def setupVssRequest(sql, limit=2000):
     ntranss=transs.count()
     methods = util_models.Methods()
 
-    if limit < ntranss :
+    if limit is not None and limit < ntranss :
         transs, percentage = truncateTransitions(transs, q, limit)
     else:
         percentage=None 

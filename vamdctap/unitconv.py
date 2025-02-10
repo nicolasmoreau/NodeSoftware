@@ -55,6 +55,24 @@ def eV2MHz (op, eV):
 def Hz2MHz(op, Hz):
     return [op, str(float(Hz)/1000000.0) ]
 
+def invcm2J(value):
+  return float(value) * (1.986*10**-23)
+  
+def J2invcm(value):
+  return float(value) / (1.986*10**-23)
+  
+def Angstr2m(value):
+  return float(value) * (1*10**-10)
+  
+def m2Angstr(value):
+  return float(value) / (1*10**-10)
+  
+def nm2m(value):
+  return float(value) * 1*10**-9
+  
+def Ry2J(value):
+  return float(value)*2.179872*10**-18
+
 # Vald specific but maybe instructive for others.
 def valdObstype(op,obstype):
     obstype=obstype.strip().strip('\'"')

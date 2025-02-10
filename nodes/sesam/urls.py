@@ -1,12 +1,13 @@
 #~ from django.conf.urls.defaults import *
-from django.conf.urls import url, include
+from django.urls import re_path, include
 
 # Uncomment the next two lines to enable the admin:
 #from django.contrib import admin
 #admin.autodiscover()
 
 urlpatterns =  [
-    url(r'^tap/', include('vamdctap.urls')),
+    re_path(r'^tap/', include('vamdctap.urls')),
+    re_path(r'^slap/', include('vamdctap.slapurls')),
 ]
 
 handler500 = 'vamdctap.views.tapServerError'
