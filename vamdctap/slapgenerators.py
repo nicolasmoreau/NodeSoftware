@@ -1,9 +1,11 @@
 # coding: utf-8 -*-
 import time
 import logging
+import xml.sax.saxutils as saxutils
 import six  # for python 2 and 3
 #from collections import Iterable
 from .unitconv import *
+
 
 # Get the node-specific parts
 from django.conf import settings
@@ -120,7 +122,7 @@ class SourceManager(object):
         if RadTrans is not None:
             G = lambda name: GetValue(name, RadTran=RadTran)
             if self.sourceReturnable is not None:
-                for RadTran in RadTrans:
+                for RadTran in RadTrans:               
                     length = GetPropertyLength(G, self.sourceReturnable)
                     if length > maxsize:
                         maxsize = length
@@ -144,7 +146,7 @@ class SourceManager(object):
                         if length > maxsize:
                             maxsize = length
 
-            self.sourceColumnCount = maxsize
+        self.sourceColumnCount = maxsize
 
     def initSources(self, Sources):
         """
@@ -226,7 +228,6 @@ def GetValue(returnable_key, **kwargs):
     the function that gets a value out of the query set, using the global name
     and the node-specific dictionary.
     """
-    # log.debug("getvalue, returnable_key : " + returnable_key)
     try:
         # obtain the RHS of the RETURNABLES dictionary
         name = RETURNABLES[returnable_key]
@@ -234,7 +235,6 @@ def GetValue(returnable_key, **kwargs):
         # The value is not in the dictionary for the node.  This is
         # fine.  Note that this is also used by if-clauses below since
         # the empty string evaluates as False.
-        log.debug(e)
         return ''
 
     if not name:
@@ -440,12 +440,12 @@ def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
                'arraysize="*" ucd="phys.atmol.element" ' +
                'utype="ssldm:Species.name" />\n')
 
-    if fields['ION_CHARGE'] is True:
-        yield(FIELD_TABS)
-        yield ('<FIELD ' +
-               ' name="ION_CHARGE" datatype="int" ' +
-               ' ucd="phys.atmol.ionization" ' +
-               ' utype="ssldm:Species.ionCharge" />\n')
+    #if fields['ION_CHARGE'] is True:
+    yield(FIELD_TABS)
+    yield ('<FIELD ' +
+            ' name="ION_CHARGE" datatype="int" ' +
+            ' ucd="phys.atmol.ionization" ' +
+            ' utype="ssldm:Species.ionCharge" />\n')
     yield(FIELD_TABS)
     yield ('<FIELD ' +
            'name="SPECIES_TYPE" datatype="char" ' +
@@ -476,6 +476,9 @@ def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
             if fields['ION_CHARGE'] is True:
                 yield(TD_TABS)
                 yield('<TD>%s</TD>\n' % (G('AtomIonCharge')))
+            else:
+                yield(TD_TABS)
+                yield('<TD>0</TD>\n')                
             yield(TD_TABS)
             yield('<TD>atom</TD>\n')
             if fields['INCHIKEY'] is True:
@@ -502,6 +505,9 @@ def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
             if fields['ION_CHARGE'] is True:
                 yield(TD_TABS)
                 yield '<TD>%s</TD>\n' % (G('MoleculeIonCharge'))
+            else: 
+                yield(TD_TABS)
+                yield('<TD>0</TD>\n')
             yield(TD_TABS)
             yield '<TD>molecule</TD>\n'
             if fields['INCHIKEY'] is True:
@@ -654,39 +660,49 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
     G = lambda name: GetValue(name, RadTran=RadTran)
     for RadTran in RadTrans:
         result.append(TR_TABS)
-        result.append('<TR>')
+        result.append('<TR>\n')
         if fields['WAVELENGTH']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
                           convertWavelength(G, 'RadTransWavelength'))
 
         line_title = []
 
         if fields['ELEMENT']:
-            line_title.append(states[G('RadTransUpperStateRef')]
+            line_title.append("lower level element : %s " % 
+                              states[G('RadTransLowerStateRef')]
+                                    ['MoleculeChemicalName'])
+            line_title.append("upper level element : %s " % 
+                              states[G('RadTransUpperStateRef')]
                                     ['MoleculeChemicalName'])
 
         if fields['IONCHARGE']:
-            line_title.append(" ion charge : %s" %
+            line_title.append(" lower level ion charge : %s " %
+                              states[G('RadTransLowerStateRef')]
+                                    ['MoleculeIonCharge'])
+            line_title.append(" upper level ion charge : %s " %
                               states[G('RadTransUpperStateRef')]
                                     ['MoleculeIonCharge'])
+        else:
+            line_title.append(" lower level ion charge : 0")
+            line_title.append(" upper level ion charge : 0")
 
         if fields['ENERGY']:
-            line_title.append(' Upper energy : %s , Lower energy : %s' %
+            line_title.append(' Upper energy : %s , Lower energy : %s ' %
                               (states[G('RadTransUpperStateRef')]
                                      ['MoleculeStateEnergy'],
                                states[G('RadTransLowerStateRef')]
                                      ['MoleculeStateEnergy']))
         result.append(TD_TABS)
-        result.append('<TD>%s</TD>' % "".join(line_title))
+        result.append('<TD>%s</TD>\n' % "".join(line_title))
 
         if fields['ENERGY']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransLowerStateRef')]
                                  ['MoleculeStateEnergy']))
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['MoleculeStateEnergy']))
 
@@ -695,13 +711,13 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
            fields['STATE_DESCRIPTION'] \
            or fields['MOLECULARQNS']:
             result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>' %
+            result.append('<TD>%s %s</TD>\n' %
                           (states[G('RadTransLowerStateRef')]
                                  ['MoleculeStateDescription'],
                            states[G('RadTransLowerStateRef')]
                                  ['MoleculeStateQNLabel']))
             result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>' %
+            result.append('<TD>%s %s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['MoleculeStateDescription'],
                            states[G('RadTransUpperStateRef')]
@@ -709,29 +725,42 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
 
         if fields['EINSTEINA']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' % (G('RadTransProbabilityA')))
+            result.append('<TD>%s</TD>\n' % (G('RadTransProbabilityA')))
 
         if fields['ELEMENT']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
+                          (states[G('RadTransLowerStateRef')]
+                                 ['MoleculeChemicalName']))
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['MoleculeChemicalName']))
 
         if fields['IONCHARGE']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
+                          (states[G('RadTransLowerStateRef')]
+                                 ['MoleculeIonCharge']))
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['MoleculeIonCharge']))
-
+        else:
+            result.append(TD_TABS)
+            result.append('<TD>0</TD>\n')
+            result.append('<TD>0</TD>\n')
+            
         if fields['INCHIKEY']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>' %
+            result.append('<TD>%s</TD>\n' %
+                          (states[G('RadTransLowerStateRef')]
+                                 ['MoleculeInchiKey']))
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['MoleculeInchiKey']))
 
         result.extend(GetSourcesTds(G, source_manager))
         result.append(TR_TABS)
-        result.append('</TR>')
+        result.append('</TR>\n')
 
     return ''.join(result)
 
@@ -760,12 +789,20 @@ def TableAtomicTrs(RadTrans, states, fields, source_manager):
         line_title = []
 
         if fields['ELEMENT']:
+            line_title.append(states[G('RadTransLowerStateRef')]['AtomSymbol'])
             line_title.append(states[G('RadTransUpperStateRef')]['AtomSymbol'])
 
         if fields['IONCHARGE']:
-            line_title.append(" ion charge : %s" %
+            line_title.append(" lower level ion charge : %s" %
+                              states[G('RadTransLowerStateRef')]
+                                    ['AtomIonCharge'])
+            line_title.append(" upper level ion charge : %s" %
                               states[G('RadTransUpperStateRef')]
                                     ['AtomIonCharge'])
+        else:
+            line_title.append(" lower level ion charge : 0")
+            line_title.append(" upper level ion charge : 0")           
+            
 
         if fields['ENERGY']:
             line_title.append(' Upper energy : %s , Lower energy : %s' %
@@ -814,9 +851,16 @@ def TableAtomicTrs(RadTrans, states, fields, source_manager):
         if fields['IONCHARGE']:
             result.append(TD_TABS)
             result.append('<TD>%s</TD>\n' %
+                          (states[G('RadTransLowerStateRef')]
+                                 ['AtomIonCharge']))
+            result.append('<TD>%s</TD>\n' %
                           (states[G('RadTransUpperStateRef')]
                                  ['AtomIonCharge']))
-
+        else:
+            result.append(TD_TABS)
+            result.append('<TD>0</TD>\n')
+            result.append('<TD>0</TD>\n')
+            
         if fields['INCHIKEY']:
             result.append(TD_TABS)
             result.append('<TD>%s</TD>\n' %
@@ -842,7 +886,7 @@ def GetPropertyLength(G, prop):
     return length
 
 
-def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
+def SlapLines(SlapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
               Environments=None, Atoms=None, Molecules=None,
               Solids=None, Particles=None, CollTrans=None, RadTrans=None,
               RadCross=None, NonRadTrans=None, MAXREC=None):
@@ -867,11 +911,13 @@ def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
             'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n' +
             '\t<RESOURCE type="results">\n' +
             '\t\t<INFO name="QUERY_STATUS" value="%s"/>\n' +
-            '\t\t<INFO name="FILE_TIMESTAMP" value="%s" />\n' +
+            '\t\t<INFO name="REQUEST_COMPLETED_TIMESTAMP" value="%s" />\n' +
+            '\t\t<INFO name="REQUEST_DESCRIPTION" value="%s" />\n' +
             '\t\t<INFO name="SERVICE_NAME" value="%s" />\n' +
             '\t\t<INFO name="SERVICE_VERSION" value="%s" />\n') %
            (getRequestStatus(MAXREC, HeaderInfo),
             int(time.time()),
+            saxutils.escape(SlapQuery),
             settings.NODENAME,
             settings.LAST_MODIFIED))
     yield('\t\t')
@@ -882,7 +928,7 @@ def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
           'utype="ssldm:Line.wavelength.value" ' +
           'datatype="double" unit="m"/>\n')
     yield(FIELD_TABS)
-    yield('<FIELD ucd="meta.title" name="IDENTIFICATION" ' +
+    yield('<FIELD ucd="meta.title" name="TITLE" ' +
           'utype="ssldm:Line.title" datatype="char" ' +
           'arraysize="*"/>\n')
 
@@ -903,12 +949,12 @@ def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
        fields['STATE_DESCRIPTION'] or \
        fields['MOLECULARQNS']:
         yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.energy;phys.atmol.level" ' +
+        yield('<FIELD ucd="phys.atmol.level" ' +
               'name="LOWER_LEVEL_NAME" ' +
               'utype="ssldm:Line.lowerLevel.name" ' +
               'datatype="char" arraysize="*"/>\n')
         yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.energy;phys.atmol.level" ' +
+        yield('<FIELD ucd="phys.atmol.level" ' +
               'name="UPPER_LEVEL_NAME" ' +
               'utype="ssldm:Line.upperLevel.name" ' +
               'datatype="char" arraysize="*"/>\n')
@@ -926,19 +972,31 @@ def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
               'name="LOWER_LEVEL_ELEMENT" ' +
               'utype="ssldm:Line.lowerLevel.element.name" ' +
               'datatype="char" arraysize="*"/>\n')
+        yield('<FIELD ucd="phys.atmol.element" ' +
+              'name="UPPER_LEVEL_ELEMENT" ' +
+              'utype="ssldm:Line.upperLevel.element.name" ' +
+              'datatype="char" arraysize="*"/>\n')
 
-    if fields['IONCHARGE']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.ionization" ' +
-              'name="LOWER_LEVEL_IONCHARGE" ' +
-              'utype="ssldm:Line.lowerLevel.element.ionCharge" ' +
-              'datatype="int" />\n')
+    #if fields['IONCHARGE']:
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.ionization" ' +
+            'name="LOWER_LEVEL_IONCHARGE" ' +
+            'utype="ssldm:Line.lowerLevel.element.ionCharge" ' +
+            'datatype="int" />\n')
+    yield('<FIELD ucd="phys.atmol.ionization" ' +
+            'name="UPPER_LEVEL_IONCHARGE" ' +
+            'utype="ssldm:Line.upperLevel.element.ionCharge" ' +
+            'datatype="int" />\n')
 
     if fields['INCHIKEY']:
         yield(FIELD_TABS)
         yield('<FIELD ucd="phys.atmol.element" ' +
               'name="LOWER_LEVEL_ELEMENT_INCHIKEY" ' +
               'utype="ssldm:Line.lowerLevel.element.inChiKey" ' +
+              'datatype="char" arraysize="*" />\n')
+        yield('<FIELD ucd="phys.atmol.element" ' +
+              'name="UPPER_LEVEL_ELEMENT_INCHIKEY" ' +
+              'utype="ssldm:Line.upperLevel.element.inChiKey" ' +
               'datatype="char" arraysize="*" />\n')
 
     # if fields['MOLECULARQNS']:
@@ -951,27 +1009,29 @@ def SlapLines(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
 
     for i in range(0, source.sourceColumnCount):
         yield(FIELD_TABS)
-        yield('<FIELD name="REFERENCE" ucd="meta.bib" ' +
+        yield('<FIELD ucd="meta.bib" name="REFERENCE"  ' +
               'datatype="char" arraysize="*" />\n')
 
     yield(FIELD_TABS)
-    yield('<DATA>\n')
-    yield('\t\t\t\t')
-    yield('<TABLEDATA>\n')
-    # molecular states
-    if MAXREC is None or MAXREC > 0:
-        if isiterable(Molecules):
-            states = GetMolecularStates(Molecules)
-            yield TableMolecularTrs(RadTrans, states, fields, source)
+    if isiterable(Molecules) is True or isiterable(Atoms) is True:
+        yield('<DATA>\n')
+        yield('\t\t\t\t')
+        yield('<TABLEDATA>\n')
 
-        if isiterable(Atoms):
-            states = GetAtomicStates(Atoms)
-            yield TableAtomicTrs(RadTrans, states, fields, source)
+        # molecular states
+        if MAXREC is None or MAXREC > 0:
+            if isiterable(Molecules):
+                states = GetMolecularStates(Molecules)
+                yield TableMolecularTrs(RadTrans, states, fields, source)
 
-    yield('\t\t\t\t')
-    yield('</TABLEDATA>\n')
-    yield('\t\t\t')
-    yield('</DATA>\n')
+            if isiterable(Atoms):
+                states = GetAtomicStates(Atoms)
+                yield TableAtomicTrs(RadTrans, states, fields, source)
+
+        yield('\t\t\t\t')
+        yield('</TABLEDATA>\n')
+        yield('\t\t\t')
+        yield('</DATA>\n')
     yield('\t\t')
     yield('</TABLE>\n')
     yield('\t')
