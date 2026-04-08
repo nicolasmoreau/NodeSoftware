@@ -94,7 +94,7 @@ RETURNABLES = {\
 # for the Species.atomic field  would be written as species__atomic.
 
 RESTRICTABLES = {\
-'MoleculeChemicalName':'ordinarystructuralformula',
+'MoleculeChemicalName':'molecule__chemical_name',
 'MoleculeStoichiometricFormula':'molecule__stoichiometric_formula',
 'RadTransWavelength':'wavelength',
 'RadTransProbabilityOscillatorStrength':'oscillator_strength',
@@ -108,11 +108,12 @@ RESTRICTABLES = {\
 
 SLAP_PARAMETERS = {\
     "WAVELENGTH" : "wavelength in the vacuum of the transition originating in the line", 
-    "MAXREC" : "", 
+    "SPECIES" : "",
+    "INCHIKEY" : "",
     "ION_CHARGE" : "", 
     "LOWER_LEVEL_ENERGY" : "", 
     "UPPER_LEVEL_ENERGY" : "", 
-    "CHEMICAL_ELEMENT" : ""
+    "MAXREC" : "", 
 }
 
 PREFIXES = {\
