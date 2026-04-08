@@ -28,13 +28,15 @@ else: LAST_MODIFIED = None
 
 
 
-def setupResults(sql, limit=None):
+def setupResults(sql, limit=None, exact=False):
 	"""		
 		Return results for request
 		@type  sql: string
 		@param sql: vss request
 		@type  limit: int
 		@param limit: maximum number of results
+        @param limit : boolean
+        @param limit : True to return the exact number defined by limit
 		@rtype:   dict
 		@return:  dictionnary containig data		
 	"""
@@ -46,7 +48,7 @@ def setupResults(sql, limit=None):
 		result = setupSources()
 	# all other requests
 	else:		
-		result = setupVssRequest(sql, limit)			
+		result = setupVssRequest(sql, limit, exact)			
 
 	if isinstance(result, util_models.Result) :
 		return result.getResult()
@@ -77,7 +79,7 @@ def setupSources():
 	result.addDataField('Sources',sources)	
 	return result
 	
-def setupVssRequest(sql, limit=2000):
+def setupVssRequest(sql, limit=2000, exact=False):
     """		
         Execute a vss request
         @type  sql: string
@@ -86,15 +88,15 @@ def setupVssRequest(sql, limit=2000):
         @return:  Result object		
     """
     result = util_models.Result()
-    q = sql2Q(sql)    
-    #log.debug(q)
+    q = sql2Q(sql)
     #select transitions : combination of density/temperature
     transs = models.Radiativetransition.objects.filter(q)
+    log.debug("SQL: %s", transs.query)
     ntranss=transs.count()
     methods = util_models.Methods()
 
     if limit is not None and limit < ntranss :
-        transs, percentage = truncateTransitions(transs, q, limit)
+        transs, percentage = truncateTransitions(transs, q, limit, exact)
     else:
         percentage=None 
     #log.debug("number of transitions : "+str(ntranss))
@@ -129,8 +131,8 @@ def setupVssRequest(sql, limit=2000):
         result.addHeaderField('COUNT-RADIATIVE',0)
     return result	
 	
-def truncateTransitions(transitions, request, maxTransitionNumber):
-	"""		
+def truncateTransitions(transitions, request, maxTransitionNumber, exact=False):
+    """		
 		limit the number of transitions
 		@type  transitions: list
 		@param transitions: a list of Transition
@@ -140,11 +142,15 @@ def truncateTransitions(transitions, request, maxTransitionNumber):
 		@param maxTransitionNumber: max number of transitions
 		@rtype:   list
 		@return:  truncated list of transitions		
-	"""
-	percentage='%.1f' % (float(maxTransitionNumber) / transitions.count() * 100)
-	transitions = transitions.order_by('wavelength')
-	newmax = transitions[maxTransitionNumber].wavelength
-	return models.Radiativetransition.objects.filter(request,Q(wavelength__lt=newmax)), percentage
+    """
+    percentage='%.1f' % (float(maxTransitionNumber) / transitions.count() * 100)
+    transitions = transitions.order_by('wavelength')
+    if exact :
+        ids = list(transitions[:maxTransitionNumber].values_list('pk', flat=True))
+        return models.Radiativetransition.objects.filter(pk__in=ids), percentage
+    else:
+        newmax = transitions[maxTransitionNumber].wavelength
+        return models.Radiativetransition.objects.filter(request,Q(wavelength__lt=newmax)), percentage
     
 def getSources(transs):
     sourceids = transs.values_list('source', flat=True).distinct()

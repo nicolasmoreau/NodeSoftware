@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import HttpResponse, StreamingHttpResponse
+from django.template import loader
 import traceback
 import logging
 import os
 import math
+import uuid
 from base64 import b64encode
 from django.conf import settings
 from importlib import import_module
 from requests.utils import CaseInsensitiveDict as CaselessDict
-from .views import tapServerError, dbConnected
+from .views import dbConnected
 from .unitconv import *
 from .slapgenerators import *
 from .sqlparse import SQL
@@ -31,10 +33,29 @@ QUERYFUNC = import_module(settings.NODEPKG+'.queryfunc')
 DICTS = import_module(settings.NODEPKG+'.dictionaries')
 RESTRICTABLES = CaselessDict(DICTS.RESTRICTABLES)
 RETURNABLES = CaselessDict(DICTS.RETURNABLES)
-SLAP_PARAMETERS = CaselessDict(DICTS.SLAP_PARAMETERS)
+SLAP_SERVICE_PARAMETERS = CaselessDict(DICTS.SLAP_PARAMETERS)
+
+# complete list of SLAP2 parameters
+# an error must be returned if one is used but not implemented
+SLAP_PARAMETERS = ("WAVELENGTH", "SPECIES", "INCHIKEY", 
+                   "SPECIES_MASS", "ION_CHARGE", "LOWER_LEVEL_ENERGY",
+                   "UPPER_LEVEL_ENERGY", "TEMPERATURE", "EINSTEINA", "MAXREC")
 
 # import helper modules that reside in the same directory
 NODEID = CaselessDict(DICTS.RETURNABLES)['NodeID']
+
+
+# This turns a 404 "not found" error into a TAP error-document
+def slapNotFoundError(request, exception):
+    text = 'Resource not found: %s'%request.path
+    document = loader.get_template('slap/SLAP-error-document.xml').render({"error_message_text" : text})
+    return HttpResponse(document, status=404, content_type='text/xml')
+
+# This turns a 500 "internal server error" into a TAP error-document
+def slapServerError(request=None, status=500, errmsg=''):
+    text = 'Error in SLAP service: %s'%errmsg
+    document = loader.get_template('slap/SLAP-error-document.xml').render({"error_message_text" : text})
+    return HttpResponse(document, status=status, content_type='text/xml')
 
 
 class SLAPQUERY(object):
@@ -53,12 +74,10 @@ class SLAPQUERY(object):
         """
         # if 'X_REQUEST_METHOD' in request.META: # workaround for mod_wsgicol
         #   self.XRequestMethod = request.META['X_REQUEST_METHOD']
-        print("SLAPQUERY 1")
         self.HTTPmethod = request.method
         self.isvalid = True
         self.errormsg = ''
         # self.token = request.token
-        print("SLAPQUERY 2")
         try :
             self.checkSlapParameters(request)
         except Exception as e:
@@ -71,12 +90,10 @@ class SLAPQUERY(object):
 
         try:
             # build a tap request from SLAP parameters
-            print("SLAPQUERY 3")
             tap_request = self.getTapRequestObject(CaselessDict(dict(request.GET or request.POST)), request_type)
             self.request = tap_request
 
         except Exception as e:
-            print("SLAPQUERY 4")
             print(e)
             traceback.print_exc()
             log.debug(self.errormsg)
@@ -84,17 +101,14 @@ class SLAPQUERY(object):
             self.errormsg = 'Could not read argument dict: %s' % e
             raise e
 
-        print("SLAPQUERY 5")
         if self.isvalid:
             self.validate()
 
         try : 
-            print("SLAPQUERY 6")
             self.fullurl = getBaseURL(request, base="slap") + \
                 'sync?' + \
                 request.META.get('QUERY_STRING')
         except Exception as e:
-            print("SLAPQUERY 7")
             print(e)
             traceback.print_exc() 
 
@@ -192,10 +206,19 @@ class SLAPQUERY(object):
             raise an exception if this is not the case
 
         """
-        slap_params = request.GET.dict()     
+        slap_params = request.GET.dict()  
+        log.debug('checkParameters')
+        log.debug(slap_params)
+
+        # WAVELENGTH is mandatory in query
+        if "WAVELENGTH" not in slap_params :
+            raise Exception("WAVELENGTH parameter is missing in query".format(param))
         for param in slap_params:
-            if param not in SLAP_PARAMETERS:
-                raise Exception("{} is not a valid SLAP parameters".format(param))
+            # may be useful to have a distinction between the 2  cases
+            # if param in SLAP_PARAMETERS and param not in SLAP_SERVICE_PARAMETERS:
+            #    raise Exception("Parameter {} is not supported".format(param))
+            if param not in SLAP_SERVICE_PARAMETERS:
+                raise Exception("Parameter {} is not supported".format(param))
         return True
 
     def paramsToTap(self, request):
@@ -205,94 +228,122 @@ class SLAPQUERY(object):
         where = []
         # slap parameter names are case insensitive
         slap_params = request
+        log.debug('paramsToTAP')
+        log.debug(slap_params)
+
 
         if 'WAVELENGTH' in slap_params:
             # WAVELENGTH is mandatory in SLAP specifications
-            wavelengths = slap_params['WAVELENGTH'][0].split()
-            if len(wavelengths) == 2:
-                if wavelengths[0] == "-Inf":
-                    where.append(' ( RadTransWavelength <= %s ) ' %
-                                 str(m2Angstr(wavelengths[1])))
-                elif wavelengths[1] == "+Inf":
-                    where.append(' ( RadTransWavelength >= %s ) ' %
-                                 str(m2Angstr(wavelengths[0])))
-                else:
-                    where.append(' ( RadTransWavelength >= %s and\
-                                     RadTransWavelength <= %s ) ' %
-                                 (str(m2Angstr(wavelengths[0])),
-                                  str(m2Angstr(wavelengths[1]))))
-            if len(wavelengths) == 1:
-                where.append(' ( RadTransWavelength = %s )' %
-                             str(m2Angstr(wavelengths[0])))
+            wavelengths = slap_params['WAVELENGTH']
+            result = []
+            for wavelength in wavelengths : 
+                curr_wavelength = wavelength.split()
+                if len(curr_wavelength) == 2:
+                    if curr_wavelength[0] == "-Inf":
+                        result.append(' ( RadTransWavelength <= %s ) ' %
+                                    str(m2Angstr(curr_wavelength[1])))
+                    elif curr_wavelength[1] == "+Inf" or curr_wavelength[1] == "Inf":
+                        result.append(' ( RadTransWavelength >= %s ) ' %
+                                    str(m2Angstr(curr_wavelength[0])))
+                    else:
+                        result.append(' ( RadTransWavelength >= %s and\
+                                        RadTransWavelength <= %s ) ' %
+                                    (str(m2Angstr(curr_wavelength[0])),
+                                    str(m2Angstr(curr_wavelength[1]))))
+                else :
+                    if len(curr_wavelength) == 1:
+                        result.append(' ( RadTransWavelength = %s )' %
+                                str(m2Angstr(curr_wavelength[0])))
+            where.append("("+" OR ".join(result) + ")")
 
         if 'ION_CHARGE' in slap_params:
-            charges = slap_params['ION_CHARGE'][0].split()
-            if len(charges) == 2:
-                if charges[0] == "-Inf":
-                    where.append(' ( IonCharge <= %s ) ' %
-                                 str(charges[1]))
-                elif charges[1] == "+Inf":
-                    where.append(' ( IonCharge >= %s ) ' %
-                                 str(charges[0]))
-                else:
-                    where.append(' ( IonCharge >= %s and\
-                                     IonCharge <= %s ) ' %
-                                 (str(charges[0]),
-                                  str(charges[1])))
-            if len(charges) == 1:
-                where.append(' ( IonCharge = %s )' %
-                             str(charges[0]))
+            charges = slap_params['ION_CHARGE']
+            result = []
+            for charge in charges :
+                curr_charges = charge.split()
+                if len(curr_charges) == 2:
+                    if curr_charges[0] == "-Inf":
+                        result.append(' ( IonCharge <= %s ) ' %
+                                    str(curr_charges[1]))
+                    elif curr_charges[1] == "+Inf" or curr_charges[1] == "Inf":
+                        result.append(' ( IonCharge >= %s ) ' %
+                                    str(curr_charges[0]))
+                    else:
+                        result.append(' ( IonCharge >= %s and\
+                                        IonCharge <= %s ) ' %
+                                    (str(curr_charges[0]),
+                                    str(curr_charges[1])))
+                if len(curr_charges) == 1:
+                    result.append(' ( IonCharge = %s )' %
+                                str(curr_charges[0]))
+            where.append("("+" OR ".join(result)+ ")")
 
-        if 'CHEMICAL_ELEMENT' in slap_params:
-            elements = slap_params['CHEMICAL_ELEMENT']
+        if 'SPECIES' in slap_params:
+            elements = slap_params['SPECIES']
+            values = []
             for element in elements:
                 if "AtomSymbol" in RESTRICTABLES:
-                    where.append(' AtomSymbol = "%s"' % element)
+                    values.append(' AtomSymbol = "%s"' % element)
                 if 'MoleculeChemicalName' in RESTRICTABLES:
-                    where.append(' MoleculeChemicalName = "%s"' % element)
+                    values.append(' MoleculeChemicalName = "%s"' % element)
+            where.append("("+" OR ".join(values)+ ")")
+
+        if 'INCHIKEY' in slap_params:
+            inchikeys = slap_params['InchiKey']
+            values = []
+            for inchikey in inchikeys : 
+                values.append(' InchiKey = "%s"' % inchikey)
+            where.append("("+" OR ".join(values)+ ")")
+
 
         if 'LOWER_LEVEL_ENERGY' in slap_params and \
            'lower.stateenergy' in RESTRICTABLES:
-            energies = slap_params['LOWER_LEVEL_ENERGY'][0].split()
-            if len(energies) == 2:
-                if energies[0] == "-Inf":
-                    where.append(' ( lower.StateEnergy <= %s ) ' %
-                                 str(J2invcm(energies[1])))
-                elif energies[1] == "+Inf":
-                    where.append(' ( lower.StateEnergy >= %s ) ' %
-                                 str(J2invcm(energies[0])))
-                else:
-                    where.append(' ( lower.StateEnergy >= %s and \
-                                 lower.StateEnergy <= %s ) ' %
-                                 (str(J2invcm(energies[0])),
-                                  str(J2invcm(energies[1]))))
-            if len(energies) == 1:
-                where.append(' ( lower.StateEnergy = %s )' %
-                             str(J2invcm(energies[0])))
+            energies = slap_params['LOWER_LEVEL_ENERGY']
+            result = []
+            for energy in energies : 
+                curr_energy = energy.split()
+                if len(curr_energy) == 2:
+                    if curr_energy[0] == "-Inf":
+                        result.append(' ( lower.StateEnergy <= %s ) ' %
+                                    str(J2invcm(curr_energy[1])))
+                    elif curr_energy[1] == "+Inf" or curr_energy[1] == "Inf":
+                        result.append(' ( lower.StateEnergy >= %s ) ' %
+                                    str(J2invcm(curr_energy[0])))
+                    else:
+                        result.append(' ( lower.StateEnergy >= %s and \
+                                    lower.StateEnergy <= %s ) ' %
+                                    (str(J2invcm(curr_energy[0])),
+                                    str(J2invcm(curr_energy[1]))))
+            if len(result) >= 1:
+                where.append("("+' OR '.join(result)+ ")")
 
         if 'UPPER_LEVEL_ENERGY' in slap_params and \
            'upper.stateenergy' in RESTRICTABLES:
             energies = slap_params['UPPER_LEVEL_ENERGY'][0].split()
+            result = []
+            for energy in energies : 
+                curr_energy = energy.split()
 
-            if len(energies) == 2:
-                if energies[0] == "-Inf":
-                    where.append(' ( upper.StateEnergy <= %s ) ' %
-                                 str(J2invcm(energies[1])))
-                elif energies[1] == "+Inf":
-                    where.append(' ( upper.StateEnergy >= %s ) ' %
-                                 str(J2invcm(energies[0])))
-                else:
-                    where.append(' ( upper.StateEnergy >= %s and \
-                                 upper.StateEnergy <= %s ) ' %
-                                 (str(J2invcm(energies[0])),
-                                  str(J2invcm(energies[1]))))
-            if len(energies) == 1:
-                where.append(' ( upper.StateEnergy = %s )' %
-                             str(J2invcm(energies[0])))
+                if len(curr_energy) == 2:
+                    if curr_energy[0] == "-Inf":
+                        where.append(' ( upper.StateEnergy <= %s ) ' %
+                                    str(J2invcm(curr_energy[1])))
+                    elif curr_energy[1] == "+Inf" or curr_energy[1] == "Inf":
+                        where.append(' ( upper.StateEnergy >= %s ) ' %
+                                    str(J2invcm(curr_energy[0])))
+                    else:
+                        where.append(' ( upper.StateEnergy >= %s and \
+                                    upper.StateEnergy <= %s ) ' %
+                                    (str(J2invcm(curr_energy[0])),
+                                    str(J2invcm(curr_energy[1]))))
+            if len(result) >= 1:
+                where.append("("+' OR '.join(result)+ ")")
+
         if len(where) == 0:
             return None
 
-        return 'select all where ' + 'AND'.join(where)
+        log.debug("### query :" + str('select all where ' + ' AND '.join(where)) )
+        return 'select all where ' + ' AND '.join(where)
 
     def getMaxrec(self):
         if 'MAXREC' in self.request:
@@ -305,11 +356,6 @@ class SLAPQUERY(object):
         return result
 
     def getResponseFormat(self):
-        if 'RESPONSEFORMAT' in self.request:
-            result = str(self.request['RESPONSEFORMAT'][0])
-            if result == "text/xml":
-                return result
-
         return "application/x-votable+xml"
 
     def __str__(self):
@@ -325,29 +371,29 @@ def doSlapQuery(query, query_type):
     except Exception as err:
         emsg = 'Query processing in setupResults() failed: %s' % err
         log.debug(emsg)
-        return tapServerError(status=400, errmsg=emsg)   
+        return slapServerError(status=400, errmsg=emsg)   
 
     try:
-        print("max : " + str(slapquery.getMaxrec()))
-        querysets = QUERYFUNC.setupResults(slapquery, slapquery.getMaxrec())
+        querysets = QUERYFUNC.setupResults(slapquery, slapquery.getMaxrec(), exact=True)
     except Exception as err:
         emsg = 'Query processing in setupResults() failed: %s' % err
         log.debug(emsg)
-        return tapServerError(status=400, errmsg=emsg)
+        return slapServerError(status=400, errmsg=emsg)
 
     response = HttpResponse('', status=204)
-    print("SLAP")
     if query_type is SLAPQUERY.LINES_REQUEST:
-        print("LINES")
-        generator = SlapLines(MAXREC=slapquery.getMaxrec(), **querysets)
+        generator = SlapLines(SlapQuery=query.get_full_path(), MAXREC=slapquery.getMaxrec(), **querysets)
     elif query_type is SLAPQUERY.SPECIES_REQUEST:
         generator = SlapSpecies(**querysets)
     else:
         raise Error("Unknown query type")
     response = StreamingHttpResponse(generator,
                                      content_type=slapquery.getResponseFormat())
+    #response['Content-Disposition'] = 'attachment; filename=%s.xml' %\
+    #                                  settings.NODENAME
     response['Content-Disposition'] = 'attachment; filename=%s.xml' %\
-                                      settings.NODENAME
+                                      uuid.uuid4()
+
     return response
 
 
