@@ -36,6 +36,7 @@ RETURNABLES = {\
 'MoleculeInchiKey':'Molecule.inchikey',
 'MoleculeInchi':'Molecule.inchi',
 'MoleculeSpeciesID':'Molecule.id',
+'MoleculeIonCharge' : '0',
 ############################################################
 #Sources
 'SourceID':'Source.id',
@@ -107,13 +108,39 @@ RESTRICTABLES = {\
 }
 
 SLAP_PARAMETERS = {\
-    "WAVELENGTH" : "wavelength in the vacuum of the transition originating in the line", 
-    "SPECIES" : "",
-    "INCHIKEY" : "",
-    "ION_CHARGE" : "", 
-    "LOWER_LEVEL_ENERGY" : "", 
-    "UPPER_LEVEL_ENERGY" : "", 
-    "MAXREC" : "", 
+    "WAVELENGTH": {
+        "restrictable": "RadTransWavelength",
+        "convert": "m2Angstr",
+        "comment": "Wavelength in meter"
+    },
+    "WAVENUMBER": {
+        "restrictable": "RadTransWavenumber",
+        "convert": None,
+        "comment": "Wavenumber in cm-1"
+        
+    },
+    "ION_CHARGE": {
+        "restrictable": "IonCharge",
+        "convert": None         
+    },
+    "LOWER_LEVEL_ENERGY": {
+        "restrictable": "lower.StateEnergy",
+        "convert": "J2invcm",
+        "comment": "Energy of lower level in Joules"
+    },
+    "UPPER_LEVEL_ENERGY": {
+        "restrictable": "upper.StateEnergy",
+        "convert": "J2invcm",
+        "comment": "Energy of upper level in Joules"
+    },
+    "EINSTEINA": {
+        "restrictable": "RadTransProbabilityA",
+        "convert": None,
+        "comment": "Transition probability in s-1"
+    },
+    "SPECIES": {},   
+    "INCHIKEY": {},  
+    "MAXREC": {},
 }
 
 PREFIXES = {\

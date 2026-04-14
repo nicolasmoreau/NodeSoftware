@@ -2,6 +2,7 @@
 import time
 import logging
 import xml.sax.saxutils as saxutils
+from datetime import datetime, timezone
 import six  # for python 2 and 3
 #from collections import Iterable
 from .unitconv import *
@@ -358,37 +359,26 @@ def LinesTableFields():
     keys :  WAVELENGTH, ENERGY, ELEMENT, IONCHARGE,
             INCHIKEY, TERM, CONFIGURATION, STATE_DESCRIPTION
     """
-    result = {'WAVELENGTH': False,
-              'ENERGY': False,
-              'ELEMENT': False,
-              'IONCHARGE': False,
-              'INCHIKEY': False,
-              "TERM": False,
-              "CONFIGURATION": False,
+    result = {
+              'SPECIES' : False,
+              'SPECIES_MASS' : False,
+              'INCHI': False,
+              'ION_CHARGE': False,
+              'LOWER_LEVEL_ENERGY': False,
+              'UPPER_LEVEL_ENERGY': False,
               "STATE_DESCRIPTION": False,
-              "EINSTEINA": False,
-              "MOLECULARQNS": False}
+              "EINSTEINA": False
+            }
 
     dictionary = set(RETURNABLES.keys())
-
-    if 'RadTransWavelength' in dictionary:
-        result['WAVELENGTH'] = True
-
-    if len(list(set(['AtomStateEnergy', 'MoleculeStateEnergy']) &
-                dictionary)) > 0:
-        result['ENERGY'] = True
-
-    if len(list(set(['AtomIonCharge', 'MoleculeIonCharge']) &
-                dictionary)) > 0:
-        result['IONCHARGE'] = True
 
     if len(list(set(['AtomSymbol', 'MoleculeChemicalName']) &
                 dictionary)) > 0:
         result['ELEMENT'] = True
 
-    if len(list(set(['AtomInchiKey', 'MoleculeInchiKey']) &
+    if len(list(set(['AtomInchi', 'MoleculeInchi']) &
                 dictionary)) > 0:
-        result['INCHIKEY'] = True
+        result['INCHI'] = True
 
     if 'AtomStateConfigurationLabel' in dictionary:
         result['CONFIGURATION'] = True
@@ -538,8 +528,13 @@ def GetMolecularStates(Molecules):
                 state = {}
                 state["MoleculeStateID"] = G('MoleculeStateID')
                 state['MoleculeChemicalName'] = H('MoleculeChemicalName')
-                state['MoleculeIonCharge'] = H('MoleculeIonCharge')
+                state['MoleculeOrdinaryStructuralFormula'] = H('MoleculeOrdinaryStructuralFormula')
+                if H('MoleculeIonCharge') != '':
+                    state['MoleculeIonCharge'] = H('MoleculeIonCharge')
+                else: 
+                    state['MoleculeIonCharge'] = 0
                 state['MoleculeInchiKey'] = H('MoleculeInchiKey')
+                state['MoleculeInchi'] = H('MoleculeInchi')
                 state['MoleculeStateDescription'] = G('MoleculeStateDescription')
                 state['MoleculeStateEnergy'] = convertEnergy(G, 'MoleculeStateEnergy')
 
@@ -605,49 +600,31 @@ def GetSourcesTds(G, source_manager):
     result = []
     if source_manager.sourceReturnable is not None:
         refs = G(source_manager.sourceReturnable)
+        refs_list = refs if isiterable(refs) else [refs]
 
-        if isiterable(refs):
-            for i in range(0, source_manager.sourceColumnCount):
-                try:
-                    if 'DigitalObjectIdentifier' in \
-                        source_manager.sources[
-                            SourceManager.getSourceIdentifier(refs[i])]:
-                            result.append('<TD>%s</TD>' %
-                                          (source_manager.sources[
-                                           SourceManager.getSourceIdentifier(
-                                               refs[i])]
-                                           ['DigitalObjectIdentifier']))
-                    elif 'UniformResourceIdentifier' in \
-                         source_manager.sources[
-                             SourceManager.getSourceIdentifier(refs[i])]:
-                            result.append('<TD>%s</TD>' %
-                                          (source_manager.sources
-                                           [SourceManager.getSourceIdentifier(
-                                            refs[i])]
-                                           ['UniformResourceIdentifier']))
-
-                # unused reference columns
-                except Exception as e:
-                    result.append('<TD></TD>')
-        else:
+        for i in range(0, source_manager.sourceColumnCount):
             try:
                 if 'DigitalObjectIdentifier' in \
                     source_manager.sources[
-                        SourceManager.getSourceIdentifier(refs)]:
-                    result.append('<TD>%s</TD>' %
-                                  (source_manager.sources[
-                                      SourceManager.getSourceIdentifier(refs)][
-                                          'DigitalObjectIdentifier']))
+                        SourceManager.getSourceIdentifier(refs_list[i])]:
+                        result.append('<TD>%s</TD>' %
+                                        (source_manager.sources[
+                                        SourceManager.getSourceIdentifier(
+                                            refs_list[i])]
+                                        ['DigitalObjectIdentifier']))
                 elif 'UniformResourceIdentifier' in \
-                     source_manager.sources[
-                         SourceManager.getSourceIdentifier(refs)]:
-                    result.append('<TD>%s</TD>' %
-                                  (source_manager.sources[
-                                   SourceManager.getSourceIdentifier(refs)][
-                                   'UniformResourceIdentifier']))
+                        source_manager.sources[
+                            SourceManager.getSourceIdentifier(refs_list[i])]:
+                        result.append('<TD>%s</TD>' %
+                                        (source_manager.sources
+                                        [SourceManager.getSourceIdentifier(
+                                        refs_list[i])]
+                                        ['UniformResourceIdentifier']))
 
+            # unused reference columns
             except Exception as e:
                 result.append('<TD></TD>')
+
     return result
 
 
@@ -661,105 +638,44 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
     for RadTran in RadTrans:
         result.append(TR_TABS)
         result.append('<TR>\n')
-        if fields['WAVELENGTH']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          convertWavelength(G, 'RadTransWavelength'))
-
-        line_title = []
-
-        if fields['ELEMENT']:
-            line_title.append("lower level element : %s " % 
-                              states[G('RadTransLowerStateRef')]
-                                    ['MoleculeChemicalName'])
-            line_title.append("upper level element : %s " % 
-                              states[G('RadTransUpperStateRef')]
-                                    ['MoleculeChemicalName'])
-
-        if fields['IONCHARGE']:
-            line_title.append(" lower level ion charge : %s " %
-                              states[G('RadTransLowerStateRef')]
-                                    ['MoleculeIonCharge'])
-            line_title.append(" upper level ion charge : %s " %
-                              states[G('RadTransUpperStateRef')]
-                                    ['MoleculeIonCharge'])
-        else:
-            line_title.append(" lower level ion charge : 0")
-            line_title.append(" upper level ion charge : 0")
-
-        if fields['ENERGY']:
-            line_title.append(' Upper energy : %s , Lower energy : %s ' %
-                              (states[G('RadTransUpperStateRef')]
-                                     ['MoleculeStateEnergy'],
-                               states[G('RadTransLowerStateRef')]
-                                     ['MoleculeStateEnergy']))
         result.append(TD_TABS)
-        result.append('<TD>%s</TD>\n' % "".join(line_title))
-
-        if fields['ENERGY']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['MoleculeStateEnergy']))
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['MoleculeStateEnergy']))
-
-        if fields['CONFIGURATION'] or \
-           fields['TERM'] or \
-           fields['STATE_DESCRIPTION'] \
-           or fields['MOLECULARQNS']:
-            result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['MoleculeStateDescription'],
-                           states[G('RadTransLowerStateRef')]
-                                 ['MoleculeStateQNLabel']))
-            result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['MoleculeStateDescription'],
-                           states[G('RadTransUpperStateRef')]
-                                 ['MoleculeStateQNLabel']))
-
+        result.append(f'<TD>{convertWavelength(G, 'RadTransWavelength')}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>NULL</TD>\n')
+        line_title = []
+        lower_ref = G('RadTransLowerStateRef')
+        upper_ref = G('RadTransUpperStateRef')
+        line_title.append((f' {states[lower_ref]['MoleculeOrdinaryStructuralFormula']} '))
+        line_title.append(states[lower_ref]['MoleculeStateQNLabel'])
+        line_title.append(' -> ')
+        line_title.append(states[upper_ref]['MoleculeStateQNLabel'])
+        result.append(TD_TABS)
+        result.append(f'<TD>{"".join(line_title)}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeChemicalName']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeInchiKey']}</TD>\n')
+        result.append(TD_TABS)
+        if fields['INCHI']:
+            result.append(f'<TD>{states[lower_ref]['MoleculeInchi']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeIonCharge']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeStateQNLabel']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[upper_ref]['MoleculeStateQNLabel']}</TD>\n')
         if fields['EINSTEINA']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' % (G('RadTransProbabilityA')))
+            result.append(f'<TD>{G('RadTransProbabilityA')}</TD>\n')
 
-        if fields['ELEMENT']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['MoleculeChemicalName']))
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['MoleculeChemicalName']))
 
-        if fields['IONCHARGE']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['MoleculeIonCharge']))
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['MoleculeIonCharge']))
-        else:
-            result.append(TD_TABS)
-            result.append('<TD>0</TD>\n')
-            result.append('<TD>0</TD>\n')
-            
-        if fields['INCHIKEY']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['MoleculeInchiKey']))
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['MoleculeInchiKey']))
-
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeStateEnergy']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[upper_ref]['MoleculeStateEnergy']}</TD>\n')
+        result.append(TD_TABS)
         result.extend(GetSourcesTds(G, source_manager))
-        result.append(TR_TABS)
+        #result.append(TR_TABS)
         result.append('</TR>\n')
 
     return ''.join(result)
@@ -886,7 +802,7 @@ def GetPropertyLength(G, prop):
     return length
 
 
-def SlapLines(SlapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
+def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
               Environments=None, Atoms=None, Molecules=None,
               Solids=None, Particles=None, CollTrans=None, RadTrans=None,
               RadCross=None, NonRadTrans=None, MAXREC=None):
@@ -902,115 +818,67 @@ def SlapLines(SlapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Funct
     fields = LinesTableFields()
     returnables = RETURNABLES.keys()
 
-    yield (('<VOTABLE version="1.3" ' +
-            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n' +
-            'xmlns="http://www.ivoa.net/xml/VOTable/v1.3"\n' +
-            'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3\n' +
-            'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"\n' +
-            'xmlns:ssldm="' +
-            'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n' +
-            '\t<RESOURCE type="results">\n' +
-            '\t\t<INFO name="QUERY_STATUS" value="%s"/>\n' +
-            '\t\t<INFO name="REQUEST_COMPLETED_TIMESTAMP" value="%s" />\n' +
-            '\t\t<INFO name="REQUEST_DESCRIPTION" value="%s" />\n' +
-            '\t\t<INFO name="SERVICE_NAME" value="%s" />\n' +
-            '\t\t<INFO name="SERVICE_VERSION" value="%s" />\n') %
-           (getRequestStatus(MAXREC, HeaderInfo),
-            int(time.time()),
-            saxutils.escape(SlapQuery),
-            settings.NODENAME,
-            settings.LAST_MODIFIED))
+    yield ((f'<VOTABLE version="1.3" ' 
+            f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
+            f'xmlns="http://www.ivoa.net/xml/VOTable/v1.3"\n' 
+            f'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3\n' 
+            f'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"\n' 
+            f'xmlns:ssldm="' 
+            f'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n' 
+            f'\t<RESOURCE type="results">\n' 
+            f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
+            f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
+            f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
+            f'\t\t <DESCRIPTION>VAMDC TAP query</DESCRIPTION>'
+            f'\t\t<INFO name="query" value="{saxutils.escape(" ".join(TapQuery.split()), {'"': '&quot;'})}" />\n'
+            f'\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#lines-2.0" />\n' 
+            f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
+            f'\t\t<INFO name="publisher" value="" />\n'))
     yield('\t\t')
     yield('<TABLE>\n')
 
     yield(FIELD_TABS)
-    yield('<FIELD ucd="em.wl" name="WAVELENGTH" ' +
-          'utype="ssldm:Line.wavelength.value" ' +
-          'datatype="double" unit="m"/>\n')
+    yield('<FIELD ucd="em.wl" name="vacuum_wavelength" ' +
+           'datatype="double" unit="m"/>\n')
     yield(FIELD_TABS)
-    yield('<FIELD ucd="meta.title" name="TITLE" ' +
-          'utype="ssldm:Line.title" datatype="char" ' +
-          'arraysize="*"/>\n')
-
-    if fields['ENERGY']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.energy;phys.atmol.level" ' +
-              'name="LOWER_LEVEL_ENERGY" ' +
-              'utype="ssldm:Line.lowerLevel.energy.value" ' +
-              ' datatype="double" unit="J"/>\n')
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.energy;phys.atmol.level" ' +
-              'name="UPPER_LEVEL_ENERGY" ' +
-              'utype="ssldm:Line.upperLevel.energy.value" ' +
-              'datatype="double" unit="J"/>\n')
-
-    if fields['CONFIGURATION'] or \
-       fields['TERM'] or \
-       fields['STATE_DESCRIPTION'] or \
-       fields['MOLECULARQNS']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.level" ' +
-              'name="LOWER_LEVEL_NAME" ' +
-              'utype="ssldm:Line.lowerLevel.name" ' +
-              'datatype="char" arraysize="*"/>\n')
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.level" ' +
-              'name="UPPER_LEVEL_NAME" ' +
-              'utype="ssldm:Line.upperLevel.name" ' +
-              'datatype="char" arraysize="*"/>\n')
-
-    if fields['EINSTEINA']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.transProb" ' +
-              'name="EINSTEIN_A" ' +
-              'utype="ssldm:Line.einsteinA.value" ' +
-              'datatype="double" unit="1/s" />\n')
-
-    if fields['ELEMENT']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.element" ' +
-              'name="LOWER_LEVEL_ELEMENT" ' +
-              'utype="ssldm:Line.lowerLevel.element.name" ' +
-              'datatype="char" arraysize="*"/>\n')
-        yield('<FIELD ucd="phys.atmol.element" ' +
-              'name="UPPER_LEVEL_ELEMENT" ' +
-              'utype="ssldm:Line.upperLevel.element.name" ' +
-              'datatype="char" arraysize="*"/>\n')
-
-    #if fields['IONCHARGE']:
+    yield('<FIELD ucd="stat.error;em.wl" name="vacuum_wavelength_error" ' +
+           'datatype="double" unit="m"/>\n')
     yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.atmol.ionization" ' +
-            'name="LOWER_LEVEL_IONCHARGE" ' +
-            'utype="ssldm:Line.lowerLevel.element.ionCharge" ' +
-            'datatype="int" />\n')
-    yield('<FIELD ucd="phys.atmol.ionization" ' +
-            'name="UPPER_LEVEL_IONCHARGE" ' +
-            'utype="ssldm:Line.upperLevel.element.ionCharge" ' +
-            'datatype="int" />\n')
+    yield('<FIELD ucd="meta.title" name="line_title" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.element" name="species_name" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.element" name="inchikey" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.element" name="inchi" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.element;phys.atmol.ionization" name="ion_charge" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="meta.title;phys.atmol.level" name="lower_level_description" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="meta.title;phys.atmol.level" name="upper_level_description" ' +
+          ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.atmol.transProb" name="einstein_a" ' +
+          ' datatype="double" unit="1/s"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.energy;phys.atmol.level" name="lower_level_energy" ' +
+          ' datatype="double" unit="J"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.energy;phys.atmol.level" name="upper_level_energy" ' +
+          ' datatype="double" unit="J"/>\n')
 
-    if fields['INCHIKEY']:
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="phys.atmol.element" ' +
-              'name="LOWER_LEVEL_ELEMENT_INCHIKEY" ' +
-              'utype="ssldm:Line.lowerLevel.element.inChiKey" ' +
-              'datatype="char" arraysize="*" />\n')
-        yield('<FIELD ucd="phys.atmol.element" ' +
-              'name="UPPER_LEVEL_ELEMENT_INCHIKEY" ' +
-              'utype="ssldm:Line.upperLevel.element.inChiKey" ' +
-              'datatype="char" arraysize="*" />\n')
-
-    # if fields['MOLECULARQNS']:
-    #   yield '<FIELD name="LOWER_LEVEL_ELEMENT_INCHIKEY"
-    #                 utype="ssldm:Line.lowerLevel.quantumState"
-    #                 datatype="char" arraysize="*" />'
-    #   yield '<FIELD name="UPPER_LEVEL_ELEMENT_INCHIKEY"
-    #                 utype="ssldm:Line.upperLevel.quantumState"
-    #                 datatype="char" arraysize="*" />'
-
-    for i in range(0, source.sourceColumnCount):
-        yield(FIELD_TABS)
-        yield('<FIELD ucd="meta.bib" name="REFERENCE"  ' +
-              'datatype="char" arraysize="*" />\n')
+    yield(FIELD_TABS)
+    for i in range(source.sourceColumnCount):
+        yield('<FIELD ucd="meta.ref.doi" name="reference_doi" ' +
+            ' datatype="char" arraysize="*"/>\n')
 
     yield(FIELD_TABS)
     if isiterable(Molecules) is True or isiterable(Atoms) is True:
