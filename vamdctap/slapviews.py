@@ -36,18 +36,28 @@ RETURNABLES = CaselessDict(DICTS.RETURNABLES)
 # service specific slap parameters
 SLAP_SERVICE_PARAMETERS = CaselessDict(DICTS.SLAP_PARAMETERS)
 
-# complete list of standard SLAP2 parameters
+# complete list of standard SLAP2 /lines parameters
 # an error must be returned if one of them is used but not implemented
-SLAP_PARAMETERS = ("WAVELENGTH", 
-                   "SPECIES",                    
-                   "SPECIES_MASS", 
-                   "INCHIKEY", 
-                   "ION_CHARGE", 
+SLAP_PARAMETERS = ("WAVELENGTH",
+                   "SPECIES",
+                   "SPECIES_MASS",
+                   "INCHIKEY",
+                   "ION_CHARGE",
                    "LOWER_LEVEL_ENERGY",
-                   "UPPER_LEVEL_ENERGY", 
-                   "TEMPERATURE", 
-                   "EINSTEINA", 
+                   "UPPER_LEVEL_ENERGY",
+                   "TEMPERATURE",
+                   "EINSTEINA",
                    "MAXREC")
+
+# complete list of standard SLAP2 /species parameters
+SLAP_SPECIES_PARAMETERS = CaselessDict({
+    "SPECIES_TYPE": None,
+    "INCHIKEY": None,
+    "INCHI": None,
+    "NUMBER_OF_ATOMS": None,
+    "SPECIES": None,
+    "STOICHIOMETRIC_FORMULA": None,
+})
 
 # import helper modules that reside in the same directory
 NODEID = CaselessDict(DICTS.RETURNABLES)['NodeID']
@@ -87,7 +97,12 @@ class SLAPQUERY(object):
         self.errormsg = ''
         # self.token = request.token
         try :
-            self.checkSlapParameters(request)
+            if request_type == SLAPQUERY.LINES_REQUEST : 
+                self.checkSlapLinesParameters(request)
+            elif request_type == SLAPQUERY.SPECIES_REQUEST : 
+                self.checkSlapSpeciesParameters(request)
+            else:
+                raise Exception(f"Unknown request_type {request_type}")
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -209,7 +224,7 @@ class SLAPQUERY(object):
             result += ' %s = %s ' % (keyword, convert(interval[0]))
         return result
     
-    def checkSlapParameters(self, request):
+    def checkSlapLinesParameters(self, request):
         """ Return True is all the parameters are valid, 
             raise an exception if this is not the case
 
@@ -228,6 +243,35 @@ class SLAPQUERY(object):
             if param not in SLAP_SERVICE_PARAMETERS:
                 raise Exception("Parameter {} is not supported".format(param))
         return True
+    
+    def checkSlapSpeciesParameters(self, request):
+        """Validate SLAP /species parameters.
+        Raise an exception if an unknown parameter is received.
+        Store validated parameters on self.species_params.
+
+        Parameter names are case-insensitive (DALI spec). Multiple occurrences
+        of the same parameter (case-insensitively) are aggregated into a list
+        (OR semantics per SLAP2 spec section 3.1).
+        """
+        raw_params = request.GET or request.POST
+        # Normalize keys to uppercase and aggregate multi-values
+        normalized = {}
+        for key in raw_params:
+            upper_key = key.upper()
+            if upper_key not in normalized:
+                normalized[upper_key] = []
+            normalized[upper_key].extend(raw_params.getlist(key))
+        slap_params = CaselessDict(normalized)
+        log.debug('checkSlapSpeciesParameters: %s', slap_params)
+        for param in slap_params:
+            if param not in SLAP_SPECIES_PARAMETERS:
+                raise Exception("Parameter {} is not a valid SLAP /species parameter".format(param))
+        self.species_params = slap_params
+        return True
+
+    def getSpeciesParams(self):
+        """Return the species filter parameters extracted from the request."""
+        return getattr(self, 'species_params', CaselessDict())
     
     def _buildInterval(self, values, vamdc_field, conversion_function=None):
         curr_values = list(map(float, values))
@@ -320,18 +364,24 @@ def doSlapQuery(query, query_type):
         log.debug(emsg)
         return slapServerError(status=400, errmsg=emsg)   
 
+    log.debug("### slapquery :" + str(slapquery) )
+
     try:
         querysets = QUERYFUNC.setupResults(slapquery, slapquery.getMaxrec(), exact=True)
     except Exception as err:
         emsg = 'Query processing in setupResults() failed: %s' % err
         log.debug(emsg)
         return slapServerError(status=400, errmsg=emsg)
+    
+    log.debug("### querysets :" + str(querysets) )
+    for q in querysets.values():
+        log.debug(q)
 
     response = HttpResponse('', status=204)
     if query_type is SLAPQUERY.LINES_REQUEST:
         generator = SlapLines(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], MAXREC=slapquery.getMaxrec(), **querysets)
     elif query_type is SLAPQUERY.SPECIES_REQUEST:
-        generator = SlapSpecies(**querysets)
+        generator = SlapSpecies(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], **querysets)
     else:
         raise Error("Unknown query type")
     response = StreamingHttpResponse(generator,

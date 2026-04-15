@@ -2028,7 +2028,6 @@ def Xsams(tap, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
     This function is to be passed to the HTTP-response object directly
     and not to be looped over beforehand.
     """
-
     yield XsamsHeader(HeaderInfo)
 
     errs=''
@@ -2135,7 +2134,8 @@ def Xsams(tap, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
     yield '</Processes>\n'
 
     if errs: yield """<!--
-           ATTENTION: There was an error in making the XML output and at least one item in the following parts was skipped: %s
+           ATTENTION: There was an error in making the XML output and at least one item in 
+           the following parts was skipped: %s
 -->
                  """ % errs
 

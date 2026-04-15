@@ -10,6 +10,8 @@
 
 # library imports
 from itertools import chain
+import re
+from unittest import result
 from vamdctap.sqlparse import sql2Q
 from django.db.models import Q
 from django.conf import settings
@@ -28,44 +30,137 @@ else: LAST_MODIFIED = None
 
 
 
+def slap_pattern_to_regex(pattern):
+    """Convert a SLAP shell wildcard pattern to an anchored regex string.
+
+    SLAP wildcards: * (any sequence), ? (any char), [seq] (char class).
+    All other characters are treated as literals.
+    """
+    result = []
+    i = 0
+    while i < len(pattern):
+        c = pattern[i]
+        if c == '*':
+            result.append('.*')
+        elif c == '?':
+            result.append('.')
+        elif c == '[':
+            # Copy bracket expression verbatim (it is valid regex syntax)
+            j = i + 1
+            if j < len(pattern) and pattern[j] in ('!', '^'):
+                j += 1
+            if j < len(pattern) and pattern[j] == ']':
+                j += 1
+            while j < len(pattern) and pattern[j] != ']':
+                j += 1
+            if j < len(pattern):
+                result.append(pattern[i:j + 1])
+                i = j
+            else:
+                result.append(re.escape(c))
+        else:
+            result.append(re.escape(c))
+        i += 1
+    return '^' + ''.join(result) + '$'
+
+
+def apply_pattern_filter(queryset, field, pattern):
+    """Filter a queryset by a SLAP shell wildcard pattern on the given field."""
+    regex = slap_pattern_to_regex(pattern)
+    return queryset.filter(**{field + '__regex': regex})
+
+
 def setupResults(sql, limit=None, exact=False):
-	"""		
-		Return results for request
-		@type  sql: string
-		@param sql: vss request
-		@type  limit: int
-		@param limit: maximum number of results
+    """
+        Return results for request
+        @type  sql: string
+        @param sql: vss request
+        @type  limit: int
+        @param limit: maximum number of results
         @param limit : boolean
         @param limit : True to return the exact number defined by limit
-		@rtype:   dict
-		@return:  dictionnary containig data		
-	"""
-	result = None
-	# return all species
-	if str(sql).strip().lower() == 'select species': 
-		result = setupSpecies()
-	elif str(sql).strip().lower() == 'select sources': 
-		result = setupSources()
-	# all other requests
-	else:		
-		result = setupVssRequest(sql, limit, exact)			
+        @rtype:   dict
+        @return:  dictionnary containig data
+    """
+    result = None
+    # return all species
+    if str(sql).strip().lower() == 'select species':
+        species_params = getattr(sql, 'species_params', None)
+        result = setupSpecies(species_params)
+    elif str(sql).strip().lower() == 'select sources':
+        result = setupSources()
+    # all other requests
+    else:
+        result = setupVssRequest(sql, limit, exact)
 
-	if isinstance(result, util_models.Result) :
-		return result.getResult()
-	else:
-		raise Exception('error while generating result')
-        
-def setupSpecies():
-	"""		
-		Return all target species
-		@rtype:   util_models.Result
-		@return:  Result object		
-	"""
-	result = util_models.Result()
-	species = models.Molecule.objects.all()
-	result.addHeaderField('COUNT-SPECIES',len(species))
-	result.addDataField('Molecules',species)	
-	return result
+    if isinstance(result, util_models.Result) :
+        return result.getResult()
+    else:
+        raise Exception('error while generating result')
+
+
+def setupSpecies(species_params=None):  
+    """
+        Return species, filtered by SLAP /species parameters if provided.
+
+        Filtering is done directly on the Django ORM because VAMDC-TAP
+        does not support parameterized 'select species' queries.
+
+        @type  species_params: dict or None
+        @param species_params: SLAP /species parameters (CaselessDict)
+        @rtype:   util_models.Result
+        @return:  Result object
+    """
+    log.debug(f"setupSpecies with parameters: {species_params}")
+    result = util_models.Result()
+    species = models.Molecule.objects.all()
+    for s in species_params:
+        log.debug(f"params: {s})")
+
+    if species_params:
+	    # SPECIES_TYPE: this service only contains molecules
+        species_type = species_params.get('SPECIES_TYPE')
+        if species_type is not None:
+            if species_type.lower() == 'atom':
+                species = species.none()
+            elif species_type.lower() != 'molecule':
+                raise Exception(
+                    "Invalid SPECIES_TYPE value '{}'. "
+                    "Allowed values: 'atom', 'molecule'.".format(species_type))
+
+        # NUMBER_OF_ATOMS: no field in the database model
+        if 'NUMBER_OF_ATOMS' in species_params:
+            raise Exception(
+                "Parameter NUMBER_OF_ATOMS is not supported by this service.")
+
+        # INCHIKEY: exact match
+        inchikey = species_params.get('INCHIKEY')
+        if inchikey is not None:
+            log.debug(f"INCHIKEY parametre provided: {inchikey}")
+            species = species.filter(inchikey__in=inchikey)
+
+        # INCHI: pattern matching
+        inchi = species_params.get('INCHI')
+        if inchi is not None:
+            species = apply_pattern_filter(species, 'inchi', inchi)
+
+        # SPECIES: pattern matching on chemical name
+        species_name = species_params.get('SPECIES')
+        log.debug("SPECIES parametre provided: {}".format(species_name))
+        if species_name is not None:
+            log.debug(f"species_name: {species_name}")
+            for s in species_name:
+                log.debug(f"species: {s}")
+                species = apply_pattern_filter(species, 'chemical_name', s)
+
+        # STOICHIOMETRIC_FORMULA: pattern matching
+        stoich = species_params.get('STOICHIOMETRIC_FORMULA')
+        if stoich is not None:
+            species = apply_pattern_filter(species, 'stoichiometric_formula', stoich)
+
+    result.addHeaderField('COUNT-SPECIES', len(species))
+    result.addDataField('Molecules', species)
+    return result
 
 def setupSources():
 	"""		

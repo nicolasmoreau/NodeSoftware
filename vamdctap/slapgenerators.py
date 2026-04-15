@@ -23,15 +23,6 @@ try:
 except Exception as e:
     NODEID = 'PleaseFillTheNodeID'
 
-try:
-    XSAMS_VERSION = RETURNABLES['XSAMSVersion']
-except Exception as e:
-    XSAMS_VERSION = '1.0'
-try:
-    SCHEMA_LOCATION = RETURNABLES['SchemaLocation']
-except Exception as e:
-    SCHEMA_LOCATION = 'http://vamdc.org/xml/xsams/%s' % XSAMS_VERSION
-
 log = logging.getLogger('vamdc.tap.generator')
 
 FIELD_TABS = '\t\t\t'
@@ -177,52 +168,6 @@ class SourceManager(object):
           Return a well-formatted identifier for a source element
         """
         return 'B%s-%s' % (NODEID, sourceId)
-
-    def makeiter(obj, n=0):
-        """
-        Return an iterable of length n, no matter what.
-        None as imput should give [], unless n!=0, then [None,None,...]
-        """
-        if not obj and obj != 0:
-            # the empty case
-            return [None] * n
-        elif not isiterable(obj):
-            if n:
-                # return single value n times
-                return [obj] * n
-            else:
-                return [obj]
-        else:
-            return obj
-
-    def makeloop(keyword, G, *args):
-        """
-        Creates a nested list of lists. All arguments should be valid dictionary
-        keywords and will be fed to G. They are expected to return iterables of equal lengths.
-        The generator yields a list of current element of each argument-list in order, so one can do e.g.
-
-           for name, unit in makeloop('TabulatedData', G, 'Name', 'Unit'):
-              ...
-        """
-        if not args:
-            return []
-        Nargs = len(args)
-        lis = []
-        for arg in args:
-            lis.append(makeiter(G("%s%s" % (keyword, arg))))
-        try:
-            Nlis = lis[0].count()
-        except TypeError:
-            Nlis = len(lis[0])
-        olist = [[] for i in range(Nargs)]
-        for i in range(Nlis):
-            for k in range(Nargs):
-                try:
-                    olist[k].append(lis[k][i])
-                except Exception:
-                    olist[k].append("")
-        return olist
-
 
 def GetValue(returnable_key, **kwargs):
     """
@@ -398,60 +343,68 @@ def LinesTableFields():
     return result
 
 
-def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
+def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
                 Environments=None, Atoms=None, Molecules=None,
                 Solids=None, Particles=None, CollTrans=None, RadTrans=None,
                 RadCross=None, NonRadTrans=None):
     """
     Return a VOTABLE containing the result of a select species request
     """
-    yield (('<VOTABLE version="1.3" ' +
-            '\nxmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' +
-            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.3" ' +
-            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 ' +
-            'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"' +
-            '\nxmlns:ssldm=' +
-            '"http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n' +
-            '\t<RESOURCE type="results">\n' +
-            '\t<INFO name="QUERY_STATUS" value="OK"/>\n' +
-            '\t<INFO name="REQUEST_COMPLETED_TIMESTAMP" value="%s" />\n' +
-            '\t<INFO name="SERVICE_VERSION" value="%s"/>\n' +
-            '\t<INFO name="SERVICE_NAME" value="%s"/>\n' +
-            '\t<TABLE>\n') % (int(time.time()),
-                            settings.LAST_MODIFIED,
-                            settings.NODENAME))
 
+    log.debug("SlapSpecies")
+    log.debug(TapQuery)
+
+    yield (('<VOTABLE version="1.3" '
+            '\nxmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.3" '
+            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 '
+            'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"'
+            '\nxmlns:ssldm='
+            '"http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
+            '\t<RESOURCE type="results">\n'
+            f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(1, HeaderInfo)}"/>\n' 
+            f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
+            f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
+            '\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#species-2.0" />\n' 
+            f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
+            f'\t\t<INFO name="publisher" value="" />\n'
+            '\t<TABLE>\n'))
+    
     fields = SpeciesTableFields()
 
     if fields['SPECIES_NAME'] is True:
         yield(FIELD_TABS)
-        yield ('<FIELD ' +
-               'name="SPECIES_NAME" datatype="char" ' +
-               'arraysize="*" ucd="phys.atmol.element" ' +
-               'utype="ssldm:Species.name" />\n')
+        yield (('<FIELD '
+                'name="species_name" datatype="char" ' 
+                'arraysize="*" ucd="phys.atmol.element" >\n'))
 
     #if fields['ION_CHARGE'] is True:
     yield(FIELD_TABS)
-    yield ('<FIELD ' +
-            ' name="ION_CHARGE" datatype="int" ' +
-            ' ucd="phys.atmol.ionization" ' +
-            ' utype="ssldm:Species.ionCharge" />\n')
+    yield (('<FIELD ' 
+            ' name="ion_charge" datatype="int" '
+            ' ucd="phys.atmol.ionization"  />\n'))
+    
     yield(FIELD_TABS)
-    yield ('<FIELD ' +
-           'name="SPECIES_TYPE" datatype="char" ' +
-           'arraysize="*" utype="ssldm:Species.type"/>\n')
+    yield (('<FIELD ' 
+           'name="species_type" datatype="char" ' 
+           'arraysize="*"/>\n'))
+    
+    yield(FIELD_TABS)
+    yield (('<FIELD '
+            ' name="inchikey" datatype="char" ' 
+            ' arraysize="*" />\n'))
 
-    if fields['INCHIKEY'] is True:
-        yield(FIELD_TABS)
-        yield ('<FIELD ' +
-               ' name="INCHIKEY" datatype="char" ' +
-               ' arraysize="*" utype="ssldm:Species.inChiKey" />\n')
+    yield(FIELD_TABS)
+    yield (('<FIELD '
+            ' name="inchi" datatype="char" ' 
+            ' arraysize="*" />\n'))
+    
+    yield(FIELD_TABS)
+    yield (('<FIELD '
+            ' name="species_stoichiometric_formula" datatype="char" ' 
+            ' arraysize="*" />\n'))
 
-    if fields['INCHI'] is True:
-        yield(FIELD_TABS)
-        yield ('<FIELD ' +
-               ' name="INCHI" datatype="char" ' +
-               ' arraysize="*" utype="ssldm:Species.inChi" />\n')
+
     yield(FIELD_TABS)
     yield '<DATA>\n\t\t\t<TABLEDATA>\n'
 
@@ -460,23 +413,22 @@ def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
         for Atom in Atoms:
             yield(TR_TABS)
             yield('<TR>\n')
-            if fields['SPECIES_NAME'] is True:
-                yield(TD_TABS)
-                yield('<TD>%s</TD>\n' % (G('AtomSymbol')))
+            yield(TD_TABS)
+            yield(f'<TD>{G("AtomSymbol")}</TD>\n')
             if fields['ION_CHARGE'] is True:
                 yield(TD_TABS)
-                yield('<TD>%s</TD>\n' % (G('AtomIonCharge')))
+                yield(f'<TD>{G("AtomIonCharge")}</TD>\n')
             else:
                 yield(TD_TABS)
                 yield('<TD>0</TD>\n')                
             yield(TD_TABS)
             yield('<TD>atom</TD>\n')
-            if fields['INCHIKEY'] is True:
-                yield(TD_TABS)
-                yield('<TD>%s</TD>\n' % (G('AtomInchiKey')))
-            if fields['INCHI'] is True:
-                yield(TD_TABS)
-                yield('<TD>%s</TD>\n' % (G('AtomInchi')))
+            yield(TD_TABS)
+            yield(f'<TD>{G("AtomInchiKey")}</TD>\n')
+            yield(TD_TABS)
+            yield(f'<TD>{G("AtomInchi")}</TD>\n')
+            yield(TD_TABS)
+            yield('<TD>NULL</TD>\n')
             yield(TR_TABS)
             yield('</TR>\n')
 
@@ -488,24 +440,24 @@ def SlapSpecies(HeaderInfo=None, Sources=None, Methods=None, Functions=None,
             if fields['SPECIES_NAME'] is True:
                 try:
                     yield(TD_TABS)
-                    yield '<TD>%s</TD>\n' % (MoleculeName(G, Molecule))
+                    yield f'<TD>{MoleculeName(G, Molecule)}</TD>\n'
                 except Exception as e:
                     yield(TD_TABS)
                     yield '<TD/>\n'
             if fields['ION_CHARGE'] is True:
                 yield(TD_TABS)
-                yield '<TD>%s</TD>\n' % (G('MoleculeIonCharge'))
+                yield f'<TD>{G("MoleculeIonCharge")}</TD>\n'
             else: 
                 yield(TD_TABS)
                 yield('<TD>0</TD>\n')
             yield(TD_TABS)
             yield '<TD>molecule</TD>\n'
-            if fields['INCHIKEY'] is True:
-                yield(TD_TABS)
-                yield '<TD>%s</TD>\n' % (G('MoleculeInchiKey'))
-            if fields['INCHI'] is True:
-                yield(TD_TABS)
-                yield '<TD>%s</TD>\n' % (G('MoleculeInchi'))
+            yield(TD_TABS)
+            yield f'<TD>{G("MoleculeInchiKey")}</TD>\n'
+            yield(TD_TABS)
+            yield f'<TD>{G("MoleculeInchi")}</TD>\n'
+            yield(TD_TABS)
+            yield f'<TD>{G("MoleculeStoichiometricFormula")}</TD>\n'
             yield(TR_TABS)
             yield '</TR>\n'
     yield ('\t\t\t\t</TABLEDATA>\n' +
@@ -693,8 +645,7 @@ def TableAtomicTrs(RadTrans, states, fields, source_manager):
         result.append('<TR>\n')
         if fields['WAVELENGTH']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (convertWavelength(G, 'RadTransWavelength')))
+            result.append(f'<TD>{convertWavelength(G, 'RadTransWavelength')}</TD>\n')
         else:
             # problematic case, how to manage all possible units ?
             # most cases handled with nm and A
