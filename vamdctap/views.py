@@ -252,8 +252,13 @@ def logCentral(sync):
 
             try:
                 # SEND THE ACTUAL REQUEST
+                if settings.DEBUG:
+                    log.info('Sending to Query Store: URL=%s' % settings.QUERY_STORE_URL)
+                    log.info('Query Store payload: %s' % logdata)
                 logreq = librequests.post(settings.QUERY_STORE_URL,
                     params=logdata, timeout=2000)
+                if settings.DEBUG:
+                    log.info('Query Store response: status=%s' % logreq.status_code)
             except Exception as e:
                 log.warn('Query Store unreachable! %s'%e)
             else:
@@ -305,8 +310,16 @@ def sync(request):
     else:
         generator = Xsams(tap=tap,**querysets)
 
+    def safe_generator():
+        try:
+            for chunk in generator:
+                yield chunk
+        except GeneratorExit:
+            log.info("Client disconnected during XML generation")
+            return
+
     log.debug('Generator set up, handing it to HttpResponse.')
-    response=StreamingHttpResponse(generator,content_type='text/xml')
+    response=StreamingHttpResponse(safe_generator(),content_type='text/xml')
     response['Content-Disposition'] = 'attachment; filename=%s-%s.%s'%(NODEID,
         datetime.datetime.now().isoformat(), tap.format)
 
