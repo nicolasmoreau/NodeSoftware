@@ -23,6 +23,9 @@ ExampleNode dictionary definitions.
 # (if you look at queryfuncs.py, you'll see 'AtomStates' being
 #  assigned)
 
+
+# VAMDC TAP dictionaries
+
 RETURNABLES = {\
 'NodeID':'sesam', # required
 ############################################################
@@ -36,7 +39,9 @@ RETURNABLES = {\
 'MoleculeInchiKey':'Molecule.inchikey',
 'MoleculeInchi':'Molecule.inchi',
 'MoleculeSpeciesID':'Molecule.id',
-'MoleculeIonCharge' : '0',
+'MoleculeIonCharge' : 'Molecule.charge',
+# this is not an official VAMDC keyword
+'MoleculeNumberOfAtoms' : 'Molecule.number_of_atoms',
 ############################################################
 #Sources
 'SourceID':'Source.id',
@@ -96,51 +101,122 @@ RETURNABLES = {\
 
 RESTRICTABLES = {\
 'MoleculeChemicalName':'molecule__chemical_name',
+'MoleculeOrdinaryStructuralFormula': 'molecule__ordinary_structural_formula',
 'MoleculeStoichiometricFormula':'molecule__stoichiometric_formula',
 'RadTransWavelength':'wavelength',
 'RadTransProbabilityOscillatorStrength':'oscillator_strength',
 'StateEnergy':'lowerstate__energy',
 'RadTransWavenumber':'wavenumber_calculated',
 'InchiKey':'inchikey',
+'Inchi':'inchi',
 'lower.StateEnergy':'lowerstate__energy',
 'upper.StateEnergy':'upperstate__energy',
 'RadTransProbabilityA':'transition_probability',
+'IonCharge' : 'molecule__charge',
+'MoleculeMolecularWeight' : 'molecule__mass',
+'MoleculeNumberOfAtoms': 'molecule__number_of_atoms',
 }
 
-SLAP_PARAMETERS = {\
+# SLAP parameters
+#
+#    "SLAP_PARAMETER_NAME": {
+#        "restrictable": "VamdcRestrictableName",
+#        "convert": "coversion_function",
+#        "isInterval" : True or False
+#    }
+SLAP_LINES_PARAMETERS = {\
     "WAVELENGTH": {
         "restrictable": "RadTransWavelength",
         "convert": "m2Angstr",
-        "comment": "Wavelength in meter"
-    },
-    "WAVENUMBER": {
-        "restrictable": "RadTransWavenumber",
-        "convert": None,
-        "comment": "Wavenumber in cm-1"
-        
+        "comment": "Wavelength in meter",
+        "isInterval" : True
     },
     "ION_CHARGE": {
         "restrictable": "IonCharge",
-        "convert": None         
+        "convert": None,
+        "isInterval" : True   
     },
     "LOWER_LEVEL_ENERGY": {
         "restrictable": "lower.StateEnergy",
         "convert": "J2invcm",
-        "comment": "Energy of lower level in Joules"
+        "comment": "Energy of lower level in Joules",
+        "isInterval" : True
     },
     "UPPER_LEVEL_ENERGY": {
         "restrictable": "upper.StateEnergy",
         "convert": "J2invcm",
-        "comment": "Energy of upper level in Joules"
+        "comment": "Energy of upper level in Joules",
+        "isInterval" : True
     },
     "EINSTEINA": {
         "restrictable": "RadTransProbabilityA",
         "convert": None,
-        "comment": "Transition probability in s-1"
+        "comment": "Transition probability in s-1",
+        "isInterval" : True
     },
-    "SPECIES": {},   
-    "INCHIKEY": {},  
-    "MAXREC": {},
+
+    "SPECIES_MASS": {
+        "restrictable": "MoleculeMolecularWeight",
+        "convert": None,
+        "comment": "",
+        "isInterval" : True
+    },
+
+    #  restrictable can be a string or a list of strings
+    "SPECIES": {
+        "restrictable":["MoleculeChemicalName", "MoleculeOrdinaryStructuralFormula"],
+        "comment":"",
+        "isInterval" : False
+    },   
+
+    "INCHIKEY": {
+        "restrictable":"InchiKey",
+        "comment":"",
+        "isInterval" : False
+    },  
+    #"MAXREC": {},
+
+    # not a standard SLAP parameter
+    "WAVENUMBER": {
+        "restrictable": "RadTransWavenumber",
+        "convert": None,
+        "comment": "Wavenumber in cm-1",
+        "isInterval" : True
+        
+    },
+}
+
+# Mapping dedicated to the species endpoint
+SPECIES_ORM_FIELDS = {
+    'InchiKey': 'inchikey',
+    'MoleculeInchi': 'inchi',
+    'MoleculeNumberOfAtoms': 'number_of_atoms',
+    'MoleculeChemicalName': 'chemical_name',
+    'MoleculeOrdinaryStructuralFormula': 'ordinary_structural_formula',
+    'MoleculeStoichiometricFormula': 'stoichiometric_formula',
+    # SLAP specific keyword
+    'SpeciesType':'type'
+}
+
+# Dictionary of parameters in the SLAP species endpoint
+#
+#    "SPECIES_TYPE": {
+#           "restrictable": "FieldInSpeciesOrmFields", 
+#           "type":"pattern|restric"
+#   }
+SLAP_SPECIES_PARAMETERS = {
+    "SPECIES_TYPE":           {"restrictable": "SpeciesType", 
+                               "type":"pattern"},  
+    "INCHIKEY":               {"restrictable": "InchiKey", 
+                               "type":"exact"},
+    "INCHI":                  {"restrictable": "MoleculeInchi", 
+                               "type":"pattern"},
+    "NUMBER_OF_ATOMS":        {"restrictable": "MoleculeNumberOfAtoms", 
+                               "type":"interval"},
+    "SPECIES":                {"restrictable": ["MoleculeChemicalName", "MoleculeOrdinaryStructuralFormula"], 
+                               "type":"pattern"},
+    "STOICHIOMETRIC_FORMULA": {"restrictable": "MoleculeStoichiometricFormula", 
+                               "type":"pattern"},
 }
 
 PREFIXES = {\

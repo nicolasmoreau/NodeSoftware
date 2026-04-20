@@ -372,11 +372,10 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     
     fields = SpeciesTableFields()
 
-    if fields['SPECIES_NAME'] is True:
-        yield(FIELD_TABS)
-        yield (('<FIELD '
-                'name="species_name" datatype="char" ' 
-                'arraysize="*" ucd="phys.atmol.element" >\n'))
+    yield(FIELD_TABS)
+    yield (('<FIELD '
+            'name="species_name" datatype="char" ' 
+            'arraysize="*" ucd="phys.atmol.element" >\n'))
 
     #if fields['ION_CHARGE'] is True:
     yield(FIELD_TABS)
@@ -403,8 +402,9 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     yield (('<FIELD '
             ' name="species_stoichiometric_formula" datatype="char" ' 
             ' arraysize="*" />\n'))
-
-
+    yield(FIELD_TABS)
+    yield (('<FIELD '
+            ' name="number_of_atoms" datatype="int" />\n'))
     yield(FIELD_TABS)
     yield '<DATA>\n\t\t\t<TABLEDATA>\n'
 
@@ -437,13 +437,8 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
         for Molecule in Molecules:
             yield(TR_TABS)
             yield '<TR>\n'
-            if fields['SPECIES_NAME'] is True:
-                try:
-                    yield(TD_TABS)
-                    yield f'<TD>{MoleculeName(G, Molecule)}</TD>\n'
-                except Exception as e:
-                    yield(TD_TABS)
-                    yield '<TD/>\n'
+            yield(TD_TABS)
+            yield f'<TD>{MoleculeName(G, Molecule)}</TD>\n'
             if fields['ION_CHARGE'] is True:
                 yield(TD_TABS)
                 yield f'<TD>{G("MoleculeIonCharge")}</TD>\n'
@@ -458,6 +453,8 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
             yield f'<TD>{G("MoleculeInchi")}</TD>\n'
             yield(TD_TABS)
             yield f'<TD>{G("MoleculeStoichiometricFormula")}</TD>\n'
+            yield(TD_TABS)
+            yield f'<TD>{G("MoleculeNumberOfAtoms")}</TD>\n'
             yield(TR_TABS)
             yield '</TR>\n'
     yield ('\t\t\t\t</TABLEDATA>\n' +
@@ -559,22 +556,21 @@ def GetSourcesTds(G, source_manager):
                 if 'DigitalObjectIdentifier' in \
                     source_manager.sources[
                         SourceManager.getSourceIdentifier(refs_list[i])]:
-                        result.append('<TD>%s</TD>' %
-                                        (source_manager.sources[
-                                        SourceManager.getSourceIdentifier(
-                                            refs_list[i])]
-                                        ['DigitalObjectIdentifier']))
-                elif 'UniformResourceIdentifier' in \
+                        value = source_manager.sources[SourceManager.getSourceIdentifier(refs_list[i])] \
+                                                      ['DigitalObjectIdentifier']
+                        result.append(TD_TABS)
+                        result.append(f'<TD>{value}</TD>\n')
+                if 'UniformResourceIdentifier' in \
                         source_manager.sources[
                             SourceManager.getSourceIdentifier(refs_list[i])]:
-                        result.append('<TD>%s</TD>' %
-                                        (source_manager.sources
-                                        [SourceManager.getSourceIdentifier(
-                                        refs_list[i])]
-                                        ['UniformResourceIdentifier']))
+                        value = (source_manager.sources[SourceManager.getSourceIdentifier(refs_list[i])] \
+                                                       ['UniformResourceIdentifier'])
+                        result.append(TD_TABS)
+                        result.append(f'<TD>{value}</TD>\n')
 
             # unused reference columns
             except Exception as e:
+                result.append(TD_TABS)
                 result.append('<TD></TD>')
 
     return result
@@ -620,14 +616,12 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
             result.append(TD_TABS)
             result.append(f'<TD>{G('RadTransProbabilityA')}</TD>\n')
 
-
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeStateEnergy']}</TD>\n')
         result.append(TD_TABS)
-        result.append(f'<TD>{states[upper_ref]['MoleculeStateEnergy']}</TD>\n')
-        result.append(TD_TABS)
+        result.append(f'<TD>{states[upper_ref]['MoleculeStateEnergy']}</TD>\n')        
         result.extend(GetSourcesTds(G, source_manager))
-        #result.append(TR_TABS)
+        result.append(TR_TABS)
         result.append('</TR>\n')
 
     return ''.join(result)
@@ -753,10 +747,9 @@ def GetPropertyLength(G, prop):
     return length
 
 
-def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
+def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
               Environments=None, Atoms=None, Molecules=None,
-              Solids=None, Particles=None, CollTrans=None, RadTrans=None,
-              RadCross=None, NonRadTrans=None, MAXREC=None):
+              RadTrans=None, MAXREC=None):
     """
     Return a VOTABLE corresponding to an input query
     """
@@ -808,7 +801,7 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Meth
           ' datatype="char" arraysize="*"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element;phys.atmol.ionization" name="ion_charge" ' +
-          ' datatype="char" arraysize="*"/>\n')
+          ' datatype="int" />\n')
     
     yield(FIELD_TABS)
     yield('<FIELD ucd="meta.title;phys.atmol.level" name="lower_level_description" ' +
@@ -826,9 +819,13 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Meth
     yield('<FIELD ucd="phys.energy;phys.atmol.level" name="upper_level_energy" ' +
           ' datatype="double" unit="J"/>\n')
 
-    yield(FIELD_TABS)
     for i in range(source.sourceColumnCount):
+        yield(FIELD_TABS)
         yield('<FIELD ucd="meta.ref.doi" name="reference_doi" ' +
+            ' datatype="char" arraysize="*"/>\n')
+        
+        yield(FIELD_TABS)
+        yield('<FIELD ucd="meta.ref.uri" name="reference_uri" ' +
             ' datatype="char" arraysize="*"/>\n')
 
     yield(FIELD_TABS)

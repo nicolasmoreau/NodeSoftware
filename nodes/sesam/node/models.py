@@ -22,6 +22,10 @@ class Molecule(models.Model):
     chemical_name = models.CharField(max_length=120)
     inchikey = models.CharField(max_length=81)
     inchi = models.CharField(max_length=30)
+    number_of_atoms = models.IntegerField(null=True)
+    mass = models.FloatField(null=False)
+    charge = models.IntegerField(null=False)
+    type = models.CharField(null=False, max_length=15)
     class Meta:
         db_table = u't_molecule'
         
@@ -170,6 +174,9 @@ class Radiativetransition(models.Model):
     oscillator_strength = models.FloatField()
     transition_probability = models.FloatField()
     inchikey = models.CharField(max_length=81)
+    inchi = models.CharField(max_length=81)
+    number_of_atoms = models.IntegerField()
+    mass = models.FloatField()
     
     def getWavenumbers(self):      
         result = []        

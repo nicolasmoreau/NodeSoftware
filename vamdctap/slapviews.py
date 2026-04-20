@@ -34,23 +34,25 @@ DICTS = import_module(settings.NODEPKG+'.dictionaries')
 RESTRICTABLES = CaselessDict(DICTS.RESTRICTABLES)
 RETURNABLES = CaselessDict(DICTS.RETURNABLES)
 # service specific slap parameters
-SLAP_SERVICE_PARAMETERS = CaselessDict(DICTS.SLAP_PARAMETERS)
+SLAP_SERVICE_LINES_PARAMETERS = CaselessDict(DICTS.SLAP_LINES_PARAMETERS)
 
 # complete list of standard SLAP2 /lines parameters
 # an error must be returned if one of them is used but not implemented
-SLAP_PARAMETERS = ("WAVELENGTH",
-                   "SPECIES",
-                   "SPECIES_MASS",
-                   "INCHIKEY",
-                   "ION_CHARGE",
-                   "LOWER_LEVEL_ENERGY",
-                   "UPPER_LEVEL_ENERGY",
-                   "TEMPERATURE",
-                   "EINSTEINA",
-                   "MAXREC")
+STANDARD_SLAP_LINES_PARAMETERS = CaselessDict({
+    "WAVELENGTH": None,
+    "SPECIES": None,
+    "SPECIES_MASS": None,
+    "INCHIKEY": None,
+    "ION_CHARGE": None,
+    "LOWER_LEVEL_ENERGY": None,
+    "UPPER_LEVEL_ENERGY": None,
+    "TEMPERATURE": None,
+    "EINSTEINA": None,
+    "MAXREC": None,
+    })
 
 # complete list of standard SLAP2 /species parameters
-SLAP_SPECIES_PARAMETERS = CaselessDict({
+STANDARD_SLAP_SPECIES_PARAMETERS = CaselessDict({
     "SPECIES_TYPE": None,
     "INCHIKEY": None,
     "INCHI": None,
@@ -235,12 +237,12 @@ class SLAPQUERY(object):
 
         # WAVELENGTH is mandatory in query
         if "WAVELENGTH" not in slap_params :
-            raise Exception("WAVELENGTH parameter is missing in query".format(param))
+            raise Exception("WAVELENGTH parameter is missing in query")
         for param in slap_params:
             # may be useful to have a distinction between the 2  cases
-            # if param in SLAP_PARAMETERS and param not in SLAP_SERVICE_PARAMETERS:
+            # if param in STANDARD_SLAP_LINES_PARAMETERS and param not in SLAP_SERVICE_LINES_PARAMETERS:
             #    raise Exception("Parameter {} is not supported".format(param))
-            if param not in SLAP_SERVICE_PARAMETERS:
+            if param not in SLAP_SERVICE_LINES_PARAMETERS:
                 raise Exception("Parameter {} is not supported".format(param))
         return True
     
@@ -264,7 +266,7 @@ class SLAPQUERY(object):
         slap_params = CaselessDict(normalized)
         log.debug('checkSlapSpeciesParameters: %s', slap_params)
         for param in slap_params:
-            if param not in SLAP_SPECIES_PARAMETERS:
+            if param not in STANDARD_SLAP_SPECIES_PARAMETERS:
                 raise Exception("Parameter {} is not a valid SLAP /species parameter".format(param))
         self.species_params = slap_params
         return True
@@ -299,18 +301,39 @@ class SLAPQUERY(object):
         where = []
         # slap parameter names are case insensitive
         slap_params = request
-        for param, mapping in SLAP_SERVICE_PARAMETERS.items():
+        for param, mapping in SLAP_SERVICE_LINES_PARAMETERS.items():
             restrictable = mapping.get('restrictable')
             convert_name = mapping.get('convert')
-            convert = getattr(unitconv, convert_name) if convert_name else lambda x: x
-            if restrictable and ( param in slap_params ) and ( restrictable in RESTRICTABLES ):
-                result = []
-                for slap_param in slap_params[param] : 
-                 
-                    values = slap_param.split()
-                    result.append(self._buildInterval(values, restrictable, convert))
+            is_interval = mapping.get('isInterval')
+            result = []
+            # several restrictables possible for a parameter
+            if isinstance(restrictable, list):                
+                for r in restrictable:
+                    convert = getattr(unitconv, convert_name) if convert_name else lambda x: x
+                    if r and ( param in slap_params ) and ( r in RESTRICTABLES ):                        
+                        if is_interval :
+                            for slap_param in slap_params[param] :
+                                values = slap_param.split()
+                                result.append(self._buildInterval(values, r, convert))
+                        else :              
+                            for param_value in slap_params[param] :                  
+                                result.append( f" ({r} = '{param_value}') ")
                 where.append("("+" OR ".join(result) + ")")
+            # one restrictable for a parameter
+            else:
+                convert = getattr(unitconv, convert_name) if convert_name else lambda x: x
+                if restrictable and ( param in slap_params ) and ( restrictable in RESTRICTABLES ):
+                    if is_interval :
+                        for slap_param in slap_params[param] :                  
+                            values = slap_param.split()
+                            result.append(self._buildInterval(values, restrictable, convert))
+                    else :                     
+                        for param_value in slap_params[param] :                  
+                            result.append( f" ({restrictable} = '{param_value}') ")
+                    where.append("("+" OR ".join(result) + ")")
+            
 
+        """
         if 'SPECIES' in slap_params:
             elements = slap_params['SPECIES']
             values = []
@@ -323,11 +346,11 @@ class SLAPQUERY(object):
                 where.append("("+" OR ".join(values)+ ")")
 
         if 'INCHIKEY' in slap_params:
-            inchikeys = slap_params['InchiKey']
+            inchikeys = slap_params['INCHIKEY']
             values = []
             for inchikey in inchikeys : 
                 values.append(' InchiKey = "%s"' % inchikey)
-            where.append("("+" OR ".join(values)+ ")")
+            where.append("("+" OR ".join(values)+ ")")"""
 
 
         if len(where) == 0:
@@ -362,6 +385,7 @@ def doSlapQuery(query, query_type):
     except Exception as err:
         emsg = 'Query processing in setupResults() failed: %s' % err
         log.debug(emsg)
+        log.debug(traceback.format_exc())
         return slapServerError(status=400, errmsg=emsg)   
 
     log.debug("### slapquery :" + str(slapquery) )
@@ -371,6 +395,7 @@ def doSlapQuery(query, query_type):
     except Exception as err:
         emsg = 'Query processing in setupResults() failed: %s' % err
         log.debug(emsg)
+        log.debug(traceback.format_exc())
         return slapServerError(status=400, errmsg=emsg)
     
     log.debug("### querysets :" + str(querysets) )

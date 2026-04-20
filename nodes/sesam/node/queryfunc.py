@@ -30,7 +30,7 @@ else: LAST_MODIFIED = None
 
 
 
-def slap_pattern_to_regex(pattern):
+def slapPatternToRegex(pattern):
     """Convert a SLAP shell wildcard pattern to an anchored regex string.
 
     SLAP wildcards: * (any sequence), ? (any char), [seq] (char class).
@@ -64,9 +64,9 @@ def slap_pattern_to_regex(pattern):
     return '^' + ''.join(result) + '$'
 
 
-def apply_pattern_filter(queryset, field, pattern):
+def applyPatternFilter(queryset, field, pattern):
     """Filter a queryset by a SLAP shell wildcard pattern on the given field."""
-    regex = slap_pattern_to_regex(pattern)
+    regex = slapPatternToRegex(pattern)
     return queryset.filter(**{field + '__regex': regex})
 
 
@@ -99,6 +99,60 @@ def setupResults(sql, limit=None, exact=False):
         raise Exception('error while generating result')
 
 
+def patternMatchingOr(src_queryset, parameter_values, field ):
+    """
+        Returns a queryset in which a pattern defined string has
+        been searched
+
+        @type src_queryset: queryset
+        @param src_queryset: a queryset where search will be performed
+        @type parameter_values: list
+        @param parameter_values: a list of values to search
+        @type field: string
+        @param field: name of searched quantity 
+
+        @return the filtered queryset
+    """
+    querysets = []
+    if parameter_values is not None:
+        for v in parameter_values:
+            querysets.append(applyPatternFilter(src_queryset, field, v))
+        src_queryset = querysets[0]
+        for qs in querysets[1:]:
+            src_queryset = src_queryset | qs
+    return src_queryset
+
+    
+def buildInterval(src_queryset, field, values, convert):
+    """
+        Returns a queryset built from an interval defined in values.
+        
+        @type src_queryset: a queryset object
+        @param src_queryset: the queryset that will be filtered with the interval
+        @type field: string
+        @param field: name of a field in the queryset
+        @type values: list
+        @param values: values defining the interval 
+        @type convert: function
+        @param convert: a function to convert results from the database unit to the standard unit
+
+        @return: the filtered queryset object
+
+    """
+    if len(values) == 2:
+        if values[0] == "-Inf":
+            return src_queryset.filter(**{f'{field}__lte':convert(values[1])})
+        elif values[1] == "+Inf" or values[1] == "Inf":
+            return src_queryset.filter(**{f'{field}__gte':convert(values[0])})
+        else:
+            return src_queryset.filter(**{f'{field}__gte':convert(values[0]), f'{field}__lte':convert(values[1])})
+    else :
+        if len(values) == 1:
+            return src_queryset.filter(**{f'{field}__exact':convert(values[0])})   
+        
+    return src_queryset
+
+
 def setupSpecies(species_params=None):  
     """
         Return species, filtered by SLAP /species parameters if provided.
@@ -111,52 +165,49 @@ def setupSpecies(species_params=None):
         @rtype:   util_models.Result
         @return:  Result object
     """
-    log.debug(f"setupSpecies with parameters: {species_params}")
+
+    def getORMColumns(parameter):
+        """
+            Return a list of model fields mapped against a SLAP parameter name
+            in the SLAP_SPECIES_PARAMETERS dictionary
+
+            @type parameter: string
+            @param parameter: name of SLAP parameter
+            @rtype: list
+            @return: list of fields
+        """
+        result = []
+        field = SLAP_SPECIES_PARAMETERS[parameter]['restrictable']
+        if isinstance(field, list) is False:
+            result.append(SPECIES_ORM_FIELDS[field])
+        else :
+            for f in field:                
+                result.append(SPECIES_ORM_FIELDS[f])
+        return result
+
     result = util_models.Result()
     species = models.Molecule.objects.all()
     for s in species_params:
-        log.debug(f"params: {s})")
-
-    if species_params:
-	    # SPECIES_TYPE: this service only contains molecules
-        species_type = species_params.get('SPECIES_TYPE')
-        if species_type is not None:
-            if species_type.lower() == 'atom':
-                species = species.none()
-            elif species_type.lower() != 'molecule':
-                raise Exception(
-                    "Invalid SPECIES_TYPE value '{}'. "
-                    "Allowed values: 'atom', 'molecule'.".format(species_type))
-
-        # NUMBER_OF_ATOMS: no field in the database model
-        if 'NUMBER_OF_ATOMS' in species_params:
-            raise Exception(
-                "Parameter NUMBER_OF_ATOMS is not supported by this service.")
-
-        # INCHIKEY: exact match
-        inchikey = species_params.get('INCHIKEY')
-        if inchikey is not None:
-            log.debug(f"INCHIKEY parametre provided: {inchikey}")
-            species = species.filter(inchikey__in=inchikey)
-
-        # INCHI: pattern matching
-        inchi = species_params.get('INCHI')
-        if inchi is not None:
-            species = apply_pattern_filter(species, 'inchi', inchi)
-
         # SPECIES: pattern matching on chemical name
-        species_name = species_params.get('SPECIES')
-        log.debug("SPECIES parametre provided: {}".format(species_name))
-        if species_name is not None:
-            log.debug(f"species_name: {species_name}")
-            for s in species_name:
-                log.debug(f"species: {s}")
-                species = apply_pattern_filter(species, 'chemical_name', s)
+        param = species_params.get(s)
+        if param is not None and s in SLAP_SPECIES_PARAMETERS:
+            param_type = SLAP_SPECIES_PARAMETERS[s]['type']
+            columns = getORMColumns(s)
+            combined = None
+            for column in columns :
+                if param_type == "pattern" :
+                    qs = patternMatchingOr(species, param, column)       
+                elif param_type == "exact" :
+                    qs = species.filter(**{f'{column}__in':param})
+                elif param_type == "interval":
+                    for p in param:
+                        qs = buildInterval(species, column, p.split(), int)
+                else :
+                    raise Exception(f"Unknown parameter type {param_type}")
 
-        # STOICHIOMETRIC_FORMULA: pattern matching
-        stoich = species_params.get('STOICHIOMETRIC_FORMULA')
-        if stoich is not None:
-            species = apply_pattern_filter(species, 'stoichiometric_formula', stoich)
+                combined = qs if combined is None else combined | qs
+            if combined is not None :
+                species = species.filter(pk__in=combined.values('pk'))
 
     result.addHeaderField('COUNT-SPECIES', len(species))
     result.addDataField('Molecules', species)
