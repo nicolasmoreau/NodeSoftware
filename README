@@ -12,7 +12,7 @@ imptools/   The import tools for reading data into a database.
 doc/        Documentation, run "make html" inside to build it.
 static/     Static files like CSS, template and the like.
 other/      Some scripts, data verification and legacy code.
-docker/     Docker files for running the sesam node locally.
+docker_db/     Docker files for running the sesam node locally.
 
 
 ## Running with Docker

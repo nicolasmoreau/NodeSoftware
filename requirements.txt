@@ -1,0 +1,6 @@
+django == 5.2.9
+mysqlclient 
+requests
+pyparsing
+gunicorn
+six

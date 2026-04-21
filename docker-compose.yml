@@ -1,0 +1,42 @@
+services:
+  db:
+    build:
+      context: ./docker_db
+      dockerfile: Dockerfile.db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: vamdc_sesam
+      MYSQL_USER: sesam_user
+      MYSQL_PASSWORD: sesam_pass
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_DB_HOST: db
+      DJANGO_DB_PORT: "3306"
+      DJANGO_DB_NAME: vamdc_sesam
+      DJANGO_DB_USER: sesam_user
+      DJANGO_DB_PASSWORD: sesam_pass
+      DJANGO_LOG_FILE: /app/slap.log
+      DEPLOY_URL: "http://localhost:8000/25.02/vamdc/slap/"
+      GUNICORN_BIND: "0.0.0.0:8000"
+
+
+volumes:
+  db_data:
