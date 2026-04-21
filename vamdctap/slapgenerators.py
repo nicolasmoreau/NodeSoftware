@@ -748,7 +748,7 @@ def GetPropertyLength(G, prop):
 
 
 def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
-              Environments=None, Atoms=None, Molecules=None,
+              Environments=None, Atoms=None, Molecules=None, Methods = None,
               RadTrans=None, MAXREC=None):
     """
     Return a VOTABLE corresponding to an input query
