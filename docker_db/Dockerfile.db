@@ -17,9 +17,9 @@ COPY init.sql /docker-entrypoint-initdb.d/
 RUN docker-entrypoint.sh mariadbd & \
     SERVER_PID=$! && \
     timeout 300 bash -c "\
-      while ! mariadb -uroot -p${MYSQL_ROOT_PASSWORD} -e 'SELECT 1' 2>/dev/null; do sleep 2; done && \
-      while ! mariadb -uroot -p${MYSQL_ROOT_PASSWORD} -e 'SHOW TABLES FROM vamdc_sesam' 2>/dev/null | grep -q v_radiativetransition; do sleep 3; done" && \
+      while ! mariadb -uroot -p\"\${MYSQL_ROOT_PASSWORD}\" -e 'SELECT 1' 2>/dev/null; do sleep 2; done && \
+      while ! mariadb -uroot -p\"\${MYSQL_ROOT_PASSWORD}\" -e 'SHOW TABLES FROM vamdc_sesam' 2>/dev/null | grep -q v_radiativetransition; do sleep 3; done" && \
     sleep 2 && \
-    mariadb-admin -uroot -p${MYSQL_ROOT_PASSWORD} shutdown && \
+    mariadb-admin -uroot -p"${MYSQL_ROOT_PASSWORD}" shutdown && \
     wait $SERVER_PID || true && \
     rm /docker-entrypoint-initdb.d/init.sql
