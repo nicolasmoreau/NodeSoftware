@@ -126,6 +126,7 @@ class SLAPQUERY(object):
             self.errormsg = 'Could not read argument dict: %s' % e
             raise e
 
+        self.where = None
         if self.isvalid:
             self.validate()
 
@@ -176,7 +177,7 @@ class SLAPQUERY(object):
             self.isvalid = False
             return
 
-        self.where = self.parsedSQL.where        
+        self.where = self.parsedSQL.where
 
         if self.errormsg:
             self.isvalid = False
@@ -315,9 +316,10 @@ class SLAPQUERY(object):
                             for slap_param in slap_params[param] :
                                 values = slap_param.split()
                                 result.append(self._buildInterval(values, r, convert))
-                        else :              
-                            for param_value in slap_params[param] :                  
+                        else :
+                            for param_value in slap_params[param] :
                                 result.append( f" ({r} = '{param_value}') ")
+            if result:
                 where.append("("+" OR ".join(result) + ")")
             # one restrictable for a parameter
             else:
