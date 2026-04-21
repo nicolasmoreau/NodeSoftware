@@ -3,9 +3,9 @@ services:
     build:
       context: ./docker_db
       dockerfile: Dockerfile.db
-    args:
-          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-          MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      args:
+        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sesam_pass}
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: vamdc_sesam
