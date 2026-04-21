@@ -1,9 +1,12 @@
 FROM mariadb:10.11
 
-ENV MYSQL_ROOT_PASSWORD=root
+ARG MYSQL_ROOT_PASSWORD=root
+ARG MYSQL_PASSWORD=sesam_pass
+
+ENV MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 ENV MYSQL_DATABASE=vamdc_sesam
 ENV MYSQL_USER=sesam_user
-ENV MYSQL_PASSWORD=sesam_pass
+ENV MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
 COPY init.sql /docker-entrypoint-initdb.d/
 
@@ -13,10 +16,10 @@ COPY init.sql /docker-entrypoint-initdb.d/
 # - Then shutdown cleanly and remove the dump
 RUN docker-entrypoint.sh mariadbd & \
     SERVER_PID=$! && \
-    timeout 300 bash -c '\
-      while ! mariadb -uroot -proot -e "SELECT 1" 2>/dev/null; do sleep 2; done && \
-      while ! mariadb -uroot -proot -e "SHOW TABLES FROM vamdc_sesam" 2>/dev/null | grep -q v_radiativetransition; do sleep 3; done' && \
+    timeout 300 bash -c "\
+      while ! mariadb -uroot -p${MYSQL_ROOT_PASSWORD} -e 'SELECT 1' 2>/dev/null; do sleep 2; done && \
+      while ! mariadb -uroot -p${MYSQL_ROOT_PASSWORD} -e 'SHOW TABLES FROM vamdc_sesam' 2>/dev/null | grep -q v_radiativetransition; do sleep 3; done" && \
     sleep 2 && \
-    mariadb-admin -uroot -proot shutdown && \
+    mariadb-admin -uroot -p${MYSQL_ROOT_PASSWORD} shutdown && \
     wait $SERVER_PID || true && \
     rm /docker-entrypoint-initdb.d/init.sql
