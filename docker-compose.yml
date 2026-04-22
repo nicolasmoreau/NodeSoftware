@@ -35,7 +35,7 @@ services:
       DJANGO_DB_USER: sesam_user
       DJANGO_DB_PASSWORD: ${MYSQL_PASSWORD}
       DJANGO_LOG_FILE: /app/slap.log
-      DEPLOY_URL: {DEPLOY_URL:-http://localhost:8000/25.02/vamdc/slap/}
+      DEPLOY_URL: ${DEPLOY_URL:-http://localhost:8000/25.02/vamdc/slap/}
       GUNICORN_BIND: "0.0.0.0:8000"
 
 
