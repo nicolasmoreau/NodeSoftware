@@ -31,7 +31,6 @@ services:
       - ${LOG_FILE_PATH:-./slap.log}:/app/slap.log
     environment:
       DJANGO_DB_HOST: db
-      DJANGO_DB_PORT: ${DATABASE_PORT:-3306}
       DJANGO_DB_NAME: vamdc_sesam
       DJANGO_DB_USER: sesam_user
       DJANGO_DB_PASSWORD: ${MYSQL_PASSWORD}
