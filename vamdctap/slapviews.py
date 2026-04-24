@@ -386,9 +386,14 @@ def doSlapQuery(query, query_type):
     for q in querysets.values():
         log.debug(q)
 
+    # Build the public-facing request URL using DEPLOY_URL (respects reverse proxy)
+    endpoint = "lines" if query_type is SLAPQUERY.LINES_REQUEST else "species"
+    qs = query.META.get('QUERY_STRING', '')
+    slap_request_url = getBaseURL(query, base="slap") + endpoint + ('?' + qs if qs else '')
+
     response = HttpResponse('', status=204)
     if query_type is SLAPQUERY.LINES_REQUEST:
-        generator = SlapLines(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], MAXREC=slapquery.getMaxrec(), **querysets)
+        generator = SlapLines(SlapQuery=slap_request_url, TapQuery=slapquery.request["QUERY"], MAXREC=slapquery.getMaxrec(), **querysets)
     elif query_type is SLAPQUERY.SPECIES_REQUEST:
         filtered_species = filterSpecies(slapquery.species_params, querysets['Molecules'])
         generator = SlapSpecies(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], Molecules=filtered_species)

@@ -13,8 +13,6 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3307:3306"
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
@@ -24,20 +22,20 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - ${APP_PORT:-8000}:8000
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - .:/app
+      - ${LOG_FILE_PATH:-./slap.log}:/app/slap.log
     environment:
       DJANGO_DB_HOST: db
-      DJANGO_DB_PORT: "3306"
       DJANGO_DB_NAME: vamdc_sesam
       DJANGO_DB_USER: sesam_user
-      DJANGO_DB_PASSWORD: sesam_pass
+      DJANGO_DB_PASSWORD: ${MYSQL_PASSWORD}
       DJANGO_LOG_FILE: /app/slap.log
-      DEPLOY_URL: "http://localhost:8000/25.02/vamdc/slap/"
+      DEPLOY_URL: ${DEPLOY_URL:-http://localhost:8000/25.02/vamdc/slap/}
       GUNICORN_BIND: "0.0.0.0:8000"
 
 

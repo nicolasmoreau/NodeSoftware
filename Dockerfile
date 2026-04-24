@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN touch /app/slap.log && chmod 666 /app/slap.log
+RUN touch /app/slap.log && chmod 644 /app/slap.log
 
 WORKDIR /app/nodes/sesam
 
