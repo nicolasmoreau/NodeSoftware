@@ -5,6 +5,7 @@ from django.template import loader
 import traceback
 import logging
 import os
+import re
 import math
 import uuid
 from base64 import b64encode
@@ -15,7 +16,8 @@ from .views import dbConnected
 from vamdctap import unitconv
 from .slapgenerators import *
 from .sqlparse import SQL
-
+from node.dictionaries import *
+from .slapspeciesfilter import filterSpecies
 
 randStr = lambda n: b64encode(os.urandom(int(math.ceil(0.75*n))))[:n]
 
@@ -100,6 +102,7 @@ class SLAPQUERY(object):
         # self.token = request.token
         try :
             if request_type == SLAPQUERY.LINES_REQUEST : 
+                log.debug(request)
                 self.checkSlapLinesParameters(request)
             elif request_type == SLAPQUERY.SPECIES_REQUEST : 
                 self.checkSlapSpeciesParameters(request)
@@ -232,7 +235,7 @@ class SLAPQUERY(object):
             raise an exception if this is not the case
 
         """
-        slap_params = request.GET.dict()  
+        slap_params = {k.upper(): v for k, v in request.GET.dict().items()}
         log.debug('checkParameters')
         log.debug(slap_params)
 
@@ -334,27 +337,6 @@ class SLAPQUERY(object):
                             result.append( f" ({restrictable} = '{param_value}') ")
                     where.append("("+" OR ".join(result) + ")")
             
-
-        """
-        if 'SPECIES' in slap_params:
-            elements = slap_params['SPECIES']
-            values = []
-            for element in elements:
-                if "AtomSymbol" in RESTRICTABLES:
-                    values.append(' AtomSymbol = "%s"' % element)
-                if 'MoleculeChemicalName' in RESTRICTABLES:
-                    values.append(' MoleculeChemicalName = "%s"' % element)
-            if len(result) >= 1:
-                where.append("("+" OR ".join(values)+ ")")
-
-        if 'INCHIKEY' in slap_params:
-            inchikeys = slap_params['INCHIKEY']
-            values = []
-            for inchikey in inchikeys : 
-                values.append(' InchiKey = "%s"' % inchikey)
-            where.append("("+" OR ".join(values)+ ")")"""
-
-
         if len(where) == 0:
             return None
 
@@ -408,7 +390,8 @@ def doSlapQuery(query, query_type):
     if query_type is SLAPQUERY.LINES_REQUEST:
         generator = SlapLines(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], MAXREC=slapquery.getMaxrec(), **querysets)
     elif query_type is SLAPQUERY.SPECIES_REQUEST:
-        generator = SlapSpecies(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], **querysets)
+        filtered_species = filterSpecies(slapquery.species_params, querysets['Molecules'])
+        generator = SlapSpecies(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], Molecules=filtered_species)
     else:
         raise Error("Unknown query type")
     response = StreamingHttpResponse(generator,

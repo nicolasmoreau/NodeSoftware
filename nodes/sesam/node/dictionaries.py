@@ -174,6 +174,8 @@ SLAP_LINES_PARAMETERS = {\
         "comment":"",
         "isInterval" : False
     },  
+
+    # MAXREC is hard-coded in slapviews.py
     #"MAXREC": {},
 
     # not a standard SLAP parameter
@@ -202,7 +204,7 @@ SPECIES_ORM_FIELDS = {
 #
 #    "SPECIES_TYPE": {
 #           "restrictable": "FieldInSpeciesOrmFields", 
-#           "type":"pattern|restric"
+#           "type":"pattern|interval"
 #   }
 SLAP_SPECIES_PARAMETERS = {
     "SPECIES_TYPE":           {"restrictable": "SpeciesType", 
