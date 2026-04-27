@@ -5,12 +5,12 @@ services:
       dockerfile: Dockerfile.db
       args:
         MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-        MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sesam_pass}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD:-database_pass}
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: vamdc_sesam
       MYSQL_USER: sesam_user
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-database_pass}
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -33,9 +33,9 @@ services:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: vamdc_sesam
       DJANGO_DB_USER: sesam_user
-      DJANGO_DB_PASSWORD: ${MYSQL_PASSWORD}
+      DJANGO_DB_PASSWORD: ${MYSQL_PASSWORD:-database_pass}
       DJANGO_LOG_FILE: /app/slap.log
-      DEPLOY_URL: ${DEPLOY_URL:-http://localhost:8000/25.02/vamdc/slap/}
+      DEPLOY_URL: ${DEPLOY_URL:-http://localhost:8000/}
       GUNICORN_BIND: "0.0.0.0:8000"
 
 

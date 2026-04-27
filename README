@@ -69,22 +69,35 @@ Add `-v` to also remove the database volume:
 | app     | 8000 |
 | db      | 3307 (mapped from 3306 inside the container) |
 
-### Environment variables
+### Docker-compose environment variables
+
 
 The following variables are set in `docker-compose.yml` and read
 by `nodes/sesam/settings.py`:
 
-| Variable           | Docker value                 
+| Variable           | Docker value                  |
 |--------------------|--------------------------------
 | DJANGO_DB_HOST     | db                            |                  
-| DJANGO_DB_PORT     | 3306                          |                  
 | DJANGO_DB_NAME     | vamdc_sesam                   |                  
 | DJANGO_DB_USER     | sesam_user                    |                  
-| DJANGO_DB_PASSWORD | sesam_pass                    |                   
-| DJANGO_LOG_FILE    | /tmp/slap.log                 |                  
-| DEPLOY_URL         | http://localhost:8000/slap/   |                  
+| DJANGO_DB_PASSWORD | database_pass                 |                   
+| DJANGO_LOG_FILE    | /app/slap.log                 |                  
+| DEPLOY_URL         | http://localhost:8000/        |                  
 | GUNICORN_BIND      | "0.0.0.0:8000"                |
 
 
 The same `settings.py` works both locally (using the defaults) and
 inside Docker (using the environment variables).
+
+
+### External environment variables
+
+Some environment variables have a default value in `docker-compose.yml` but
+their value can be defined in a separate .env file ( not committed ). This allow the service manager 
+to define strong password for the database without committing them in the git repository.
+
+| Variable               | Default value                     |
+|------------------------|------------------------------------
+| MYSQL_ROOT_PASSWORD    | root                              |                  
+| MYSQL_PASSWORD         | database_pass                     |                  
+| DEPLOY_URL             | http://localhost:8000/            |                  
