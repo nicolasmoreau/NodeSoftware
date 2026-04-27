@@ -32,8 +32,14 @@ This starts two containers:
 
 The SLAP2 service is then available at:
 
-    http://localhost:8000/slap/lines?WAVELENGTH=9e-8+9.1e-8
+    http://localhost:8000/slap/lines?WAVELENGTH=9.9e-8+9.91e-8
     http://localhost:8000/slap/species
+
+
+The VAMDC-TAP service is available at:
+
+    http://localhost:8000/tap/sync?FORMAT=XSAMS&RAQUEST=doQuery&LANG=VSS2&QUERY=select+all+where+RadTransWavelength>=990+AND+RadTransWavelength<=991
+    http://localhost:8000/tap/sync?FORMAT=XSAMS&RAQUEST=doQuery&LANG=VSS2&QUERY=select+species
 
 ### Building the database image
 
