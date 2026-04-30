@@ -354,11 +354,11 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     log.debug("SlapSpecies")
     log.debug(TapQuery)
 
-    yield (('<VOTABLE version="1.3" '
+    yield (('<VOTABLE version="1.5" '
             '\nxmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
-            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.3" '
-            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 '
-            'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"'
+            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.5" '
+            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5 '
+            'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"'
             '\nxmlns:ssldm='
             '"http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
             '\t<RESOURCE type="results">\n'
@@ -762,13 +762,13 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     fields = LinesTableFields()
     returnables = RETURNABLES.keys()
 
-    yield ((f'<VOTABLE version="1.3" ' 
+    yield ((f'<VOTABLE version="1.5" '
             f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
-            f'xmlns="http://www.ivoa.net/xml/VOTable/v1.3"\n' 
-            f'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3\n' 
-            f'http://www.ivoa.net/xml/VOTable/VOTable-1.3.xsd"\n' 
-            f'xmlns:ssldm="' 
-            f'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n' 
+            f'xmlns="http://www.ivoa.net/xml/VOTable/v1.5"\n'
+            f'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5\n'
+            f'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"\n'
+            f'xmlns:ssldm="'
+            f'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
             f'\t<RESOURCE type="results">\n' 
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc)}" />\n'
