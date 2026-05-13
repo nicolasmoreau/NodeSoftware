@@ -243,6 +243,10 @@ class SLAPQUERY(object):
         if "WAVELENGTH" not in slap_params :
             raise Exception("WAVELENGTH parameter is missing in query")
         for param in slap_params:
+            # MAXREC is a DALI generic parameter handled at the framework level,
+            # not in the node dictionary.
+            if param == "MAXREC":
+                continue
             # may be useful to have a distinction between the 2  cases
             # if param in STANDARD_SLAP_LINES_PARAMETERS and param not in SLAP_SERVICE_LINES_PARAMETERS:
             #    raise Exception("Parameter {} is not supported".format(param))
