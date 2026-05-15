@@ -8,6 +8,7 @@ import os
 import re
 import math
 import uuid
+from urllib.parse import unquote_plus
 from base64 import b64encode
 from django.conf import settings
 from importlib import import_module
@@ -51,6 +52,7 @@ STANDARD_SLAP_LINES_PARAMETERS = CaselessDict({
     "TEMPERATURE": None,
     "EINSTEINA": None,
     "MAXREC": None,
+    "RESPONSEFORMAT" : None
     })
 
 # complete list of standard SLAP2 /species parameters
@@ -61,6 +63,7 @@ STANDARD_SLAP_SPECIES_PARAMETERS = CaselessDict({
     "NUMBER_OF_ATOMS": None,
     "SPECIES": None,
     "STOICHIOMETRIC_FORMULA": None,
+    "RESPONSEFORMAT" : None
 })
 
 # import helper modules that reside in the same directory
@@ -247,6 +250,17 @@ class SLAPQUERY(object):
             # not in the node dictionary.
             if param == "MAXREC":
                 continue
+
+            if param == "RESPONSEFORMAT":
+                responseformat = unquote_plus(slap_params.get('RESPONSEFORMAT'))
+                if responseformat:
+                    accepted = {'application/x-votable+xml', 'text/xml', 'votable'}
+                    if responseformat.lower() not in accepted:
+                        raise Exception(
+                            f"RESPONSEFORMAT '{responseformat}' is not supported. "
+                            f"Supported formats: {', '.join(sorted(accepted))}"
+                        )
+                    continue
             # may be useful to have a distinction between the 2  cases
             # if param in STANDARD_SLAP_LINES_PARAMETERS and param not in SLAP_SERVICE_LINES_PARAMETERS:
             #    raise Exception("Parameter {} is not supported".format(param))
@@ -276,6 +290,18 @@ class SLAPQUERY(object):
         for param in slap_params:
             if param not in STANDARD_SLAP_SPECIES_PARAMETERS:
                 raise Exception("Parameter {} is not a valid SLAP /species parameter".format(param))
+            
+            if param == "RESPONSEFORMAT":
+                responseformat = slap_params.get('RESPONSEFORMAT')
+                if responseformat:
+                    accepted = {'application/x-votable+xml', 'text/xml', 'votable'}
+                    responseformat_value = unquote_plus(responseformat[0]).lower()
+                    if responseformat_value not in accepted:
+                        raise Exception(
+                            f"RESPONSEFORMAT '{responseformat_value}' is not supported. "
+                            f"Supported formats: {', '.join(sorted(accepted))}"
+                        )
+                    continue
         self.species_params = slap_params
         return True
 
