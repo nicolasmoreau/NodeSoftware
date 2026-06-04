@@ -129,6 +129,9 @@ def filterSpecies(species_params, species):
         # SPECIES: pattern matching on chemical name
         param = species_params.get(s)
         if param is not None and s in SLAP_SPECIES_PARAMETERS:
+            normalize = SLAP_SPECIES_PARAMETERS[s].get('normalize')
+            if normalize is not None:
+                param = [normalize(v) for v in param]
             param_type = SLAP_SPECIES_PARAMETERS[s]['type']
             columns = getORMColumns(s)
             combined = None
