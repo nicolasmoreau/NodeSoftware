@@ -484,6 +484,7 @@ def GetMolecularStates(Molecules):
                     state['MoleculeIonCharge'] = 0
                 state['MoleculeInchiKey'] = H('MoleculeInchiKey')
                 state['MoleculeInchi'] = H('MoleculeInchi')
+                state['MoleculeMolecularWeight'] = H('MoleculeMolecularWeight')
                 state['MoleculeStateDescription'] = G('MoleculeStateDescription')
                 state['MoleculeStateEnergy'] = convertEnergy(G, 'MoleculeStateEnergy')
 
@@ -601,6 +602,8 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
         result.append(f'<TD>{"".join(line_title)}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeChemicalName']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeMolecularWeight']}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeInchiKey']}</TD>\n')
         result.append(TD_TABS)
@@ -773,7 +776,6 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc)}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
-            f'\t\t <DESCRIPTION>VAMDC TAP query</DESCRIPTION>\n'
             f'\t\t<INFO name="query" value="{saxutils.escape(" ".join(TapQuery.split()), {'"': '&quot;'})}" />\n'
             f'\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#lines-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
@@ -793,6 +795,9 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="species_name" ' +
           ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.mass" name="species_mass" ' +
+          ' datatype="float"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="inchikey" ' +
           ' datatype="char" arraysize="*"/>\n')
@@ -853,3 +858,4 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield('\t')
     yield('</RESOURCE>\n')
     yield('</VOTABLE>')
+
