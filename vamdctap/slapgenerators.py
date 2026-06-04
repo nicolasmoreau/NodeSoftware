@@ -346,13 +346,16 @@ def LinesTableFields():
 def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
                 Environments=None, Atoms=None, Molecules=None,
                 Solids=None, Particles=None, CollTrans=None, RadTrans=None,
-                RadCross=None, NonRadTrans=None):
+                RadCross=None, NonRadTrans=None, MAXREC=None):
     """
     Return a VOTABLE containing the result of a select species request
     """
 
     log.debug("SlapSpecies")
     log.debug(TapQuery)
+
+    if HeaderInfo is None:
+        HeaderInfo = {}
 
     yield (('<VOTABLE version="1.5" '
             '\nxmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
@@ -362,7 +365,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
             '\nxmlns:ssldm='
             '"http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
             '\t<RESOURCE type="results">\n'
-            f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(1, HeaderInfo)}"/>\n' 
+            f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n'
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
             '\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#species-2.0" />\n' 
@@ -408,55 +411,56 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     yield(FIELD_TABS)
     yield '<DATA>\n\t\t\t<TABLEDATA>\n'
 
-    if Atoms:
-        G = lambda name: GetValue(name, Atom=Atom)
-        for Atom in Atoms:
-            yield(TR_TABS)
-            yield('<TR>\n')
-            yield(TD_TABS)
-            yield(f'<TD>{G("AtomSymbol")}</TD>\n')
-            if fields['ION_CHARGE'] is True:
+    if MAXREC is None or MAXREC > 0:
+        if Atoms:
+            G = lambda name: GetValue(name, Atom=Atom)
+            for Atom in Atoms:
+                yield(TR_TABS)
+                yield('<TR>\n')
                 yield(TD_TABS)
-                yield(f'<TD>{G("AtomIonCharge")}</TD>\n')
-            else:
+                yield(f'<TD>{G("AtomSymbol")}</TD>\n')
+                if fields['ION_CHARGE'] is True:
+                    yield(TD_TABS)
+                    yield(f'<TD>{G("AtomIonCharge")}</TD>\n')
+                else:
+                    yield(TD_TABS)
+                    yield('<TD>0</TD>\n')
                 yield(TD_TABS)
-                yield('<TD>0</TD>\n')                
-            yield(TD_TABS)
-            yield('<TD>atom</TD>\n')
-            yield(TD_TABS)
-            yield(f'<TD>{G("AtomInchiKey")}</TD>\n')
-            yield(TD_TABS)
-            yield(f'<TD>{G("AtomInchi")}</TD>\n')
-            yield(TD_TABS)
-            yield('<TD>NULL</TD>\n')
-            yield(TR_TABS)
-            yield('</TR>\n')
+                yield('<TD>atom</TD>\n')
+                yield(TD_TABS)
+                yield(f'<TD>{G("AtomInchiKey")}</TD>\n')
+                yield(TD_TABS)
+                yield(f'<TD>{G("AtomInchi")}</TD>\n')
+                yield(TD_TABS)
+                yield('<TD>NULL</TD>\n')
+                yield(TR_TABS)
+                yield('</TR>\n')
 
-    if Molecules:
-        G = lambda name: GetValue(name, Molecule=Molecule)
-        for Molecule in Molecules:
-            yield(TR_TABS)
-            yield '<TR>\n'
-            yield(TD_TABS)
-            yield f'<TD>{MoleculeName(G, Molecule)}</TD>\n'
-            if fields['ION_CHARGE'] is True:
+        if Molecules:
+            G = lambda name: GetValue(name, Molecule=Molecule)
+            for Molecule in Molecules:
+                yield(TR_TABS)
+                yield '<TR>\n'
                 yield(TD_TABS)
-                yield f'<TD>{G("MoleculeIonCharge")}</TD>\n'
-            else: 
+                yield f'<TD>{MoleculeName(G, Molecule)}</TD>\n'
+                if fields['ION_CHARGE'] is True:
+                    yield(TD_TABS)
+                    yield f'<TD>{G("MoleculeIonCharge")}</TD>\n'
+                else:
+                    yield(TD_TABS)
+                    yield('<TD>0</TD>\n')
                 yield(TD_TABS)
-                yield('<TD>0</TD>\n')
-            yield(TD_TABS)
-            yield '<TD>molecule</TD>\n'
-            yield(TD_TABS)
-            yield f'<TD>{G("MoleculeInchiKey")}</TD>\n'
-            yield(TD_TABS)
-            yield f'<TD>{G("MoleculeInchi")}</TD>\n'
-            yield(TD_TABS)
-            yield f'<TD>{G("MoleculeStoichiometricFormula")}</TD>\n'
-            yield(TD_TABS)
-            yield f'<TD>{G("MoleculeNumberOfAtoms")}</TD>\n'
-            yield(TR_TABS)
-            yield '</TR>\n'
+                yield '<TD>molecule</TD>\n'
+                yield(TD_TABS)
+                yield f'<TD>{G("MoleculeInchiKey")}</TD>\n'
+                yield(TD_TABS)
+                yield f'<TD>{G("MoleculeInchi")}</TD>\n'
+                yield(TD_TABS)
+                yield f'<TD>{G("MoleculeStoichiometricFormula")}</TD>\n'
+                yield(TD_TABS)
+                yield f'<TD>{G("MoleculeNumberOfAtoms")}</TD>\n'
+                yield(TR_TABS)
+                yield '</TR>\n'
     yield ('\t\t\t\t</TABLEDATA>\n' +
            '\t\t\t</DATA>\n' +
            '\t\t</TABLE>\n' +
@@ -484,6 +488,7 @@ def GetMolecularStates(Molecules):
                     state['MoleculeIonCharge'] = 0
                 state['MoleculeInchiKey'] = H('MoleculeInchiKey')
                 state['MoleculeInchi'] = H('MoleculeInchi')
+                state['MoleculeMolecularWeight'] = H('MoleculeMolecularWeight')
                 state['MoleculeStateDescription'] = G('MoleculeStateDescription')
                 state['MoleculeStateEnergy'] = convertEnergy(G, 'MoleculeStateEnergy')
 
@@ -601,6 +606,8 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
         result.append(f'<TD>{"".join(line_title)}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeChemicalName']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['MoleculeMolecularWeight']}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeInchiKey']}</TD>\n')
         result.append(TD_TABS)
@@ -773,7 +780,6 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc)}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
-            f'\t\t <DESCRIPTION>VAMDC TAP query</DESCRIPTION>\n'
             f'\t\t<INFO name="query" value="{saxutils.escape(" ".join(TapQuery.split()), {'"': '&quot;'})}" />\n'
             f'\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#lines-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
@@ -793,6 +799,9 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="species_name" ' +
           ' datatype="char" arraysize="*"/>\n')
+    yield(FIELD_TABS)
+    yield('<FIELD ucd="phys.mass" name="species_mass" ' +
+          ' datatype="float"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="inchikey" ' +
           ' datatype="char" arraysize="*"/>\n')

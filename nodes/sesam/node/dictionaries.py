@@ -129,7 +129,8 @@ SLAP_LINES_PARAMETERS = {\
         "restrictable": "RadTransWavelength",
         "convert": "m2Angstr",
         "comment": "Wavelength in meter",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit" : "m"
     },
     "ION_CHARGE": {
         "restrictable": "IonCharge",
@@ -140,26 +141,31 @@ SLAP_LINES_PARAMETERS = {\
         "restrictable": "lower.StateEnergy",
         "convert": "J2invcm",
         "comment": "Energy of lower level in Joules",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit":"J"
     },
     "UPPER_LEVEL_ENERGY": {
         "restrictable": "upper.StateEnergy",
         "convert": "J2invcm",
         "comment": "Energy of upper level in Joules",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit":"J"
     },
     "EINSTEINA": {
         "restrictable": "RadTransProbabilityA",
         "convert": None,
         "comment": "Transition probability in s-1",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit":"1/s"
+
     },
 
     "SPECIES_MASS": {
         "restrictable": "MoleculeMolecularWeight",
         "convert": None,
         "comment": "",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit" : "u"
     },
 
     #  restrictable can be a string or a list of strings
@@ -183,7 +189,8 @@ SLAP_LINES_PARAMETERS = {\
         "restrictable": "RadTransWavenumber",
         "convert": None,
         "comment": "Wavenumber in cm-1",
-        "isInterval" : True
+        "isInterval" : True,
+        "unit":"1/cm"
         
     },
 }

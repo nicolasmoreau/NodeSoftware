@@ -38,6 +38,7 @@ RESTRICTABLES = CaselessDict(DICTS.RESTRICTABLES)
 RETURNABLES = CaselessDict(DICTS.RETURNABLES)
 # service specific slap parameters
 SLAP_SERVICE_LINES_PARAMETERS = CaselessDict(DICTS.SLAP_LINES_PARAMETERS)
+SLAP_SERVICE_SPECIES_PARAMETERS = CaselessDict(DICTS.SLAP_SPECIES_PARAMETERS)
 
 # complete list of standard SLAP2 /lines parameters
 # an error must be returned if one of them is used but not implemented
@@ -49,7 +50,6 @@ STANDARD_SLAP_LINES_PARAMETERS = CaselessDict({
     "ION_CHARGE": None,
     "LOWER_LEVEL_ENERGY": None,
     "UPPER_LEVEL_ENERGY": None,
-    "TEMPERATURE": None,
     "EINSTEINA": None,
     "MAXREC": None,
     "RESPONSEFORMAT" : None
@@ -63,8 +63,121 @@ STANDARD_SLAP_SPECIES_PARAMETERS = CaselessDict({
     "NUMBER_OF_ATOMS": None,
     "SPECIES": None,
     "STOICHIOMETRIC_FORMULA": None,
+    "MAXREC": None,
     "RESPONSEFORMAT" : None
 })
+
+# Standard SLAP2 parameter metadata for capabilities.xml generation
+# Keys: name, use, std, description, unit (opt), ucd (opt), utype (opt), dataType, arraysize (opt)
+_SLAP2_LINES_METADATA = {
+    "WAVELENGTH":          {"use": "required", "std": "true",
+                            "description": "Vacuum wavelength range in metres.",
+                            "unit": "m", "ucd": "em.wl",
+                            "utype": "ssldm:Line.wavelength.value",
+                            "dataType": "real", "arraysize": "2"},
+    "SPECIES":             {"use": "optional", "std": "true",
+                            "description": "Chemical name or formula of the species (pattern matching).",
+                            "ucd": "phys.atmol.element",
+                            "utype": "ssldm:Line.lowerLevel.element.name",
+                            "dataType": "string"},
+    "SPECIES_MASS":        {"use": "optional", "std": "true",
+                            "description": "Molecular mass of the species in Unified Atomic Mass Unit (u).",
+                            "unit": "u", "ucd": "phys.mass",
+                            "dataType": "real", "arraysize": "2"},
+    "INCHIKEY":            {"use": "optional", "std": "true",
+                            "description": "InChIKey identifier of the species (exact match).",
+                            "ucd": "phys.atmol.element",
+                            "dataType": "string"},
+    "ION_CHARGE":          {"use": "optional", "std": "true",
+                            "description": "Ion charge of the species.",
+                            "ucd": "phys.atmol.ionization",
+                            "utype": "ssldm:Line.lowerLevel.element.ionCharge",
+                            "dataType": "integer", "arraysize": "2"},
+    "LOWER_LEVEL_ENERGY":  {"use": "optional", "std": "true",
+                            "description": "Energy of the lower level of the transition in Joules.",
+                            "unit": "J", "ucd": "phys.energy;phys.atmol.level",
+                            "utype": "ssldm:Line.lowerLevel.energy.value",
+                            "dataType": "real", "arraysize": "2"},
+    "UPPER_LEVEL_ENERGY":  {"use": "optional", "std": "true",
+                            "description": "Energy of the upper level of the transition in Joules.",
+                            "unit": "J", "ucd": "phys.energy;phys.atmol.level",
+                            "utype": "ssldm:Line.upperLevel.energy.value",
+                            "dataType": "real", "arraysize": "2"},
+    "EINSTEINA":           {"use": "optional", "std": "true",
+                            "description": "Einstein A coefficient range in s-1.",
+                            "unit": "1/s", "ucd": "phys.atmol.transProb",
+                            "utype": "ssldm:Line.probability.einsteinA",
+                            "dataType": "real", "arraysize": "2"},
+    "MAXREC":              {"use": "optional", "std": "true",
+                            "description": "Maximum number of records to return.",
+                            "dataType": "integer"},
+    "RESPONSEFORMAT":      {"use": "optional", "std": "true",
+                            "description": "MIME type of the response format. Supported: application/x-votable+xml, text/xml.",
+                            "dataType": "string"}
+}
+
+_SLAP2_SPECIES_METADATA = {
+    "SPECIES_TYPE":            {"use": "optional", "std": "true",
+                                "description": "Type of species: atom or molecule.",
+                                "dataType": "string"},
+    "INCHIKEY":                {"use": "optional", "std": "true",
+                                "description": "InChIKey identifier of the species (exact match).",
+                                "ucd": "phys.atmol.element",
+                                "dataType": "string"},
+    "INCHI":                   {"use": "optional", "std": "true",
+                                "description": "InChI identifier of the species (pattern matching).",
+                                "ucd": "phys.atmol.element",
+                                "dataType": "string"},
+    "NUMBER_OF_ATOMS":         {"use": "optional", "std": "true",
+                                "description": "Number of atoms in the species.",
+                                "dataType": "integer", "arraysize": "2"},
+    "SPECIES":                 {"use": "optional", "std": "true",
+                                "description": "Chemical name or structural formula (pattern matching).",
+                                "ucd": "phys.atmol.element",
+                                "dataType": "string"},
+    "STOICHIOMETRIC_FORMULA":  {"use": "optional", "std": "true",
+                                "description": "Stoichiometric formula of the species (pattern matching).",
+                                "ucd": "phys.atmol.element",
+                                "dataType": "string"},
+    "MAXREC":              {"use": "optional", "std": "true",
+                            "description": "Maximum number of records to return.",
+                            "dataType": "integer"},
+    "RESPONSEFORMAT":          {"use": "optional", "std": "true",
+                                "description": "MIME type of the response format. Supported: application/x-votable+xml, text/xml.",
+                                "dataType": "string"},
+}
+
+
+def _build_param_list(node_params, standard_metadata, always_include=("MAXREC", "RESPONSEFORMAT")):
+    """
+    Build an ordered list of param dicts for a capabilities endpoint.
+    node_params: dict from dictionaries.py (params the node supports)
+    standard_metadata: standard SLAP2 metadata per param name
+    always_include: param names always present regardless of node_params
+    """
+    params = []
+    seen = set()
+    for name_key in node_params:
+        name = name_key.upper()
+        if name in seen:
+            continue
+        seen.add(name)
+        meta = standard_metadata.get(name)
+        if meta is None:
+            node_info = node_params[name_key]
+            meta = {
+                "use": "optional", "std": "false",
+                "description": node_info.get("comment", ""),
+                "dataType": "real" if node_info.get("isInterval") else "string",
+            }
+            if node_info.get("isInterval"):
+                meta["arraysize"] = "2"
+        params.append({"name": name, **meta})
+    for name in always_include:
+        if name not in seen:
+            meta = standard_metadata.get(name, {"use": "optional", "std": "true", "dataType": "string"})
+            params.append({"name": name, **meta})
+    return params
 
 # import helper modules that reside in the same directory
 NODEID = CaselessDict(DICTS.RETURNABLES)['NodeID']
@@ -425,8 +538,21 @@ def doSlapQuery(query, query_type):
     if query_type is SLAPQUERY.LINES_REQUEST:
         generator = SlapLines(SlapQuery=slap_request_url, TapQuery=slapquery.request["QUERY"], MAXREC=slapquery.getMaxrec(), **querysets)
     elif query_type is SLAPQUERY.SPECIES_REQUEST:
+        maxrec = slapquery.getMaxrec()
         filtered_species = filterSpecies(slapquery.species_params, querysets['Molecules'])
-        generator = SlapSpecies(SlapQuery=query.build_absolute_uri(), TapQuery=slapquery.request["QUERY"], Molecules=filtered_species)
+        header_info = {}
+        if maxrec is not None and maxrec > 0:
+            count = filtered_species.count()
+            if count > maxrec:
+                filtered_species = filtered_species[:maxrec]
+                header_info['TRUNCATED'] = True
+        generator = SlapSpecies(
+            SlapQuery=query.build_absolute_uri(),
+            TapQuery=slapquery.request["QUERY"],
+            Molecules=filtered_species,
+            MAXREC=maxrec,
+            HeaderInfo=header_info,
+        )
     else:
         raise Error("Unknown query type")
     response = StreamingHttpResponse(generator,
@@ -461,11 +587,14 @@ def cleandict(indict):
 
 
 def capabilities(request):
-    c = {"accessURL": getBaseURL(request, base="slap"),
-         "restrictables": RESTRICTABLES}
-    return render(request, 'slap/capabilities.xml',
-                              c,
-                              content_type='text/xml')
+    slap_base = request.build_absolute_uri(request.path.rsplit('capabilities', 1)[0])
+    c = {
+        "accessURL": getBaseURL(request, base="slap"),
+        "slapStaticURL": slap_base + "static/",
+        "lines_params": _build_param_list(SLAP_SERVICE_LINES_PARAMETERS, _SLAP2_LINES_METADATA),
+        "species_params": _build_param_list(SLAP_SERVICE_SPECIES_PARAMETERS, _SLAP2_SPECIES_METADATA),
+    }
+    return render(request, 'slap/capabilities.xml', c, content_type='text/xml')
 
 
 def availability(request):
