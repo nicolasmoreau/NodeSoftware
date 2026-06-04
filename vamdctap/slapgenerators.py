@@ -862,3 +862,4 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield('\t')
     yield('</RESOURCE>\n')
     yield('</VOTABLE>')
+
