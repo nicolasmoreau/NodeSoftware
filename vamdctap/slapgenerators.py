@@ -807,7 +807,7 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield('<FIELD ucd="phys.atmol.element" name="inchi" ' +
           ' datatype="char" arraysize="*"/>\n')
     yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.atmol.element;phys.atmol.ionization" name="ion_charge" ' +
+    yield('<FIELD ucd="phys.atmol.ionization" name="ion_charge" ' +
           ' datatype="int" />\n')
     
     yield(FIELD_TABS)
