@@ -366,6 +366,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n'
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
+            f'\t\t<INFO name="service_ivoid" value="{getattr(settings, "SERVICE_IVOID", "")}"/>\n'
             '\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#species-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
             f'\t\t<INFO name="publisher" value="" />\n'
@@ -391,17 +392,17 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="inchikey" datatype="char" ' 
+            ' name="inchikey" datatype="char" ucd="phys.atmol.element" ' 
             ' arraysize="*" />\n'))
 
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="inchi" datatype="char" ' 
+            ' name="inchi" datatype="char" ucd="phys.atmol.element" ' 
             ' arraysize="*" />\n'))
     
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="species_stoichiometric_formula" datatype="char" ' 
+            ' name="species_stoichiometric_formula" datatype="char"  ucd="phys.atmol.element"' 
             ' arraysize="*" />\n'))
     yield(FIELD_TABS)
     yield (('<FIELD '
