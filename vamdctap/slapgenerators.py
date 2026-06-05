@@ -376,7 +376,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     yield(FIELD_TABS)
     yield (('<FIELD '
             'name="species_name" datatype="char" ' 
-            'arraysize="*" ucd="phys.atmol.element" >\n'))
+            'arraysize="*" ucd="phys.atmol.element" />\n'))
 
     #if fields['ION_CHARGE'] is True:
     yield(FIELD_TABS)
