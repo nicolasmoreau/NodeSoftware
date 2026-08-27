@@ -122,77 +122,126 @@ RESTRICTABLES = {\
 #    "SLAP_PARAMETER_NAME": {
 #        "restrictable": "VamdcRestrictableName",
 #        "convert": "coversion_function",
-#        "isInterval" : True or False
+#        "isInterval" : True or False,
+#        # SLAP2 capabilities.xml metadata for standard parameters
+#        # (omit "std"/"use" for node-specific, non-standard parameters)
+#        "use": "required|optional", "std": True,
+#        "description": "...", "unit": "...", "dataType": "real|integer|string"
 #    }
 SLAP_LINES_PARAMETERS = {\
     "WAVELENGTH": {
         "restrictable": "RadTransWavelength",
         "convert": "m2Angstr",
-        "comment": "Wavelength in meter",
         "isInterval" : True,
-        "unit" : "m"
+        "use": "required", 
+        "std": True,
+        "description": "Vacuum wavelength range in metres.",
+        "unit" : "m", 
+        "dataType": "real",
+        "multiValued" : False
     },
     "ION_CHARGE": {
         "restrictable": "IonCharge",
         "convert": None,
-        "isInterval" : True   
+        "isInterval" : True,
+        "use": "optional", 
+        "std": True,
+        "description": "Ion charge of the species.",
+        "dataType": "integer",
+        "multiValued" : False
     },
     "LOWER_LEVEL_ENERGY": {
         "restrictable": "lower.StateEnergy",
         "convert": "J2invcm",
-        "comment": "Energy of lower level in Joules",
         "isInterval" : True,
-        "unit":"J"
+        "use": "optional", 
+        "std": True,
+        "description": "Energy of the lower level of the transition in Joules.",
+        "unit":"J", 
+        "dataType": "real",
+        "multiValued" : False
     },
     "UPPER_LEVEL_ENERGY": {
         "restrictable": "upper.StateEnergy",
         "convert": "J2invcm",
-        "comment": "Energy of upper level in Joules",
         "isInterval" : True,
-        "unit":"J"
+        "use": "optional", 
+        "std": True,
+        "description": "Energy of the upper level of the transition in Joules.",
+        "unit":"J",
+        "dataType": "real",
+        "multiValued" : False
     },
     "EINSTEINA": {
         "restrictable": "RadTransProbabilityA",
         "convert": None,
-        "comment": "Transition probability in s-1",
         "isInterval" : True,
-        "unit":"1/s"
-
+        "use": "optional", 
+        "std": True,
+        "description": "Einstein A coefficient range in s-1.",
+        "unit":"s**-1",
+        "dataType": "real",
+        "multiValued" : False
     },
 
     "SPECIES_MASS": {
         "restrictable": "MoleculeMolecularWeight",
         "convert": None,
-        "comment": "",
         "isInterval" : True,
-        "unit" : "u"
+        "use": "optional", 
+        "std": True,
+        "description": "Molecular mass of the species in Unified Atomic Mass Unit (u).",
+        "unit" : "u",
+        "dataType": "real",
+        "multiValued" : False
     },
 
     #  restrictable can be a string or a list of strings
     "SPECIES": {
         "restrictable":["MoleculeChemicalName", "MoleculeOrdinaryStructuralFormula"],
-        "comment":"",
-        "isInterval" : False
-    },   
+        "isInterval" : False,
+        "use": "optional", 
+        "std": True,
+        "description": "Chemical name or formula of the species (pattern matching).",
+        "dataType": "string",
+        "multiValued" : True
+    },
 
     "INCHIKEY": {
         "restrictable":"InchiKey",
-        "comment":"",
-        "isInterval" : False
-    },  
-
-    # MAXREC is hard-coded in slapviews.py
-    #"MAXREC": {},
+        "isInterval" : False,
+        "use": "optional", 
+        "std": True,
+        "description": "InChIKey identifier of the species (exact match).",
+        "dataType": "string",
+        "multiValued" : True
+    },
 
     # not a standard SLAP parameter
     "WAVENUMBER": {
         "restrictable": "RadTransWavenumber",
         "convert": None,
-        "comment": "Wavenumber in cm-1",
         "isInterval" : True,
-        "unit":"1/cm"
-        
+        "std": "false",
+        "description": "Wavenumber in cm-1",
+        "unit":"cm**-1",
+        "multiValued" : False
     },
+}
+
+# Metadata for SLAP2 parameters shared by both the /lines and /species
+# endpoints (they are handled at the framework/view level rather than
+# through SLAP_LINES_PARAMETERS/SLAP_SPECIES_PARAMETERS).
+SLAP_COMMON_PARAMETERS = {
+    "MAXREC": {"use": "optional", 
+               "std": True,
+               "description": "Maximum number of records to return.",
+               "dataType": "integer"},
+
+    "RESPONSEFORMAT": {"use": "optional", 
+                       "std": True,
+                        "description": "MIME type of the response format. Supported: application/x-votable+xml, text/xml.",
+                        "dataType": "string"},
 }
 
 # Mapping dedicated to the species endpoint
@@ -210,23 +259,57 @@ SPECIES_ORM_FIELDS = {
 # Dictionary of parameters in the SLAP species endpoint
 #
 #    "SPECIES_TYPE": {
-#           "restrictable": "FieldInSpeciesOrmFields", 
-#           "type":"pattern|interval"
+#           "restrictable": "FieldInSpeciesOrmFields",
+#           "type":"pattern|interval",
+#           # SLAP2 capabilities.xml metadata
+#           "use": "required|optional", "std": True,
+#           "description": "...", "dataType": "real|integer|string"
 #   }
 SLAP_SPECIES_PARAMETERS = {
-    "SPECIES_TYPE":           {"restrictable": "SpeciesType", 
-                               "type":"pattern"},  
-    "INCHIKEY":               {"restrictable": "InchiKey", 
-                               "type":"exact"},
-    "INCHI":                  {"restrictable": "MoleculeInchi", 
-                               "type":"pattern",
-                               "normalize": lambda v: v if v.startswith('InChI=') else 'InChI=' + v},
-    "NUMBER_OF_ATOMS":        {"restrictable": "MoleculeNumberOfAtoms", 
-                               "type":"interval"},
-    "SPECIES":                {"restrictable": ["MoleculeChemicalName", "MoleculeOrdinaryStructuralFormula"], 
-                               "type":"pattern"},
-    "STOICHIOMETRIC_FORMULA": {"restrictable": "MoleculeStoichiometricFormula", 
-                               "type":"pattern"},
+    "SPECIES_TYPE":           { "restrictable": "SpeciesType",
+                                "type":"pattern",
+                                "use": "optional", "std": True,
+                                "description": "Type of species: atom or molecule.",
+                                "dataType": "string",
+                                "multiValued" : False
+                               },
+    "INCHIKEY":               { "restrictable": "InchiKey",
+                                "type":"exact",
+                                "use": "optional", "std": True,
+                                "description": "InChIKey identifier of the species (exact match).",
+                                "dataType": "string",
+                                "multiValued" : True
+                               },
+    "INCHI":                  { "restrictable": "MoleculeInchi",
+                                "type":"pattern",
+                                "normalize": lambda v: v if v.startswith('InChI=') else 'InChI=' + v,
+                                "use": "optional", "std": True,
+                                "description": "InChI identifier of the species (pattern matching).",
+                                "dataType": "string",
+                                "multiValued" : True
+                               },
+    "NUMBER_OF_ATOMS":        { "restrictable": "MoleculeNumberOfAtoms",
+                                "type":"interval",
+                                "use": "optional", "std": True,
+                                "description": "Number of atoms in the species.",
+                                "dataType": "integer",
+                                "multiValued" : False
+                               },
+    "SPECIES":                { "restrictable": ["MoleculeChemicalName", "MoleculeOrdinaryStructuralFormula"],
+                                "type":"pattern",
+                                "use": "optional", "std": True,
+                                "description": "Chemical name or structural formula (pattern matching).",
+                                "dataType": "string",
+                                "multiValued" : True
+                               },
+    "STOICHIOMETRIC_FORMULA": { "restrictable": "MoleculeStoichiometricFormula",
+                                "type":"pattern",
+                                "use": "optional", 
+                                "std": True,
+                                "description": "Stoichiometric formula of the species (pattern matching).",
+                                "dataType": "string",
+                                "multiValued" : True
+                               },
 }
 
 PREFIXES = {\

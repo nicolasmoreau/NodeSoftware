@@ -37,122 +37,22 @@ DICTS = import_module(settings.NODEPKG+'.dictionaries')
 RESTRICTABLES = CaselessDict(DICTS.RESTRICTABLES)
 RETURNABLES = CaselessDict(DICTS.RETURNABLES)
 # service specific slap parameters
-SLAP_SERVICE_LINES_PARAMETERS = CaselessDict(DICTS.SLAP_LINES_PARAMETERS)
-SLAP_SERVICE_SPECIES_PARAMETERS = CaselessDict(DICTS.SLAP_SPECIES_PARAMETERS)
-
-# complete list of standard SLAP2 /lines parameters
-# an error must be returned if one of them is used but not implemented
-STANDARD_SLAP_LINES_PARAMETERS = CaselessDict({
-    "WAVELENGTH": None,
-    "SPECIES": None,
-    "SPECIES_MASS": None,
-    "INCHIKEY": None,
-    "ION_CHARGE": None,
-    "LOWER_LEVEL_ENERGY": None,
-    "UPPER_LEVEL_ENERGY": None,
-    "EINSTEINA": None,
-    "MAXREC": None,
-    "RESPONSEFORMAT" : None
-    })
+LINES_PARAMETERS = DICTS.SLAP_LINES_PARAMETERS
+SPECIES_PARAMETERS = DICTS.SLAP_SPECIES_PARAMETERS
+COMMON_PARAMETERS = DICTS.SLAP_COMMON_PARAMETERS
 
 # complete list of standard SLAP2 /species parameters
-STANDARD_SLAP_SPECIES_PARAMETERS = CaselessDict({
-    "SPECIES_TYPE": None,
-    "INCHIKEY": None,
-    "INCHI": None,
-    "NUMBER_OF_ATOMS": None,
-    "SPECIES": None,
-    "STOICHIOMETRIC_FORMULA": None,
-    "MAXREC": None,
-    "RESPONSEFORMAT" : None
-})
+STANDARD_SLAP_SPECIES_PARAMETERS = {k : v for k, v in SPECIES_PARAMETERS.items() if v.get("std") is True}
+STANDARD_SLAP_SPECIES_PARAMETERS.update(COMMON_PARAMETERS)
 
-# Standard SLAP2 parameter metadata for capabilities.xml generation
-# Keys: name, use, std, description, unit (opt), ucd (opt), utype (opt), dataType, arraysize (opt)
-_SLAP2_LINES_METADATA = {
-    "WAVELENGTH":          {"use": "required", "std": "true",
-                            "description": "Vacuum wavelength range in metres.",
-                            "unit": "m", "ucd": "em.wl",
-                            "utype": "ssldm:Line.wavelength.value",
-                            "dataType": "real", "arraysize": "2"},
-    "SPECIES":             {"use": "optional", "std": "true",
-                            "description": "Chemical name or formula of the species (pattern matching).",
-                            "ucd": "phys.atmol.element",
-                            "utype": "ssldm:Line.lowerLevel.element.name",
-                            "dataType": "string"},
-    "SPECIES_MASS":        {"use": "optional", "std": "true",
-                            "description": "Molecular mass of the species in Unified Atomic Mass Unit (u).",
-                            "unit": "u", "ucd": "phys.mass",
-                            "dataType": "real", "arraysize": "2"},
-    "INCHIKEY":            {"use": "optional", "std": "true",
-                            "description": "InChIKey identifier of the species (exact match).",
-                            "ucd": "phys.atmol.element",
-                            "dataType": "string"},
-    "ION_CHARGE":          {"use": "optional", "std": "true",
-                            "description": "Ion charge of the species.",
-                            "ucd": "phys.atmol.ionization",
-                            "utype": "ssldm:Line.lowerLevel.element.ionCharge",
-                            "dataType": "integer", "arraysize": "2"},
-    "LOWER_LEVEL_ENERGY":  {"use": "optional", "std": "true",
-                            "description": "Energy of the lower level of the transition in Joules.",
-                            "unit": "J", "ucd": "phys.energy;phys.atmol.level",
-                            "utype": "ssldm:Line.lowerLevel.energy.value",
-                            "dataType": "real", "arraysize": "2"},
-    "UPPER_LEVEL_ENERGY":  {"use": "optional", "std": "true",
-                            "description": "Energy of the upper level of the transition in Joules.",
-                            "unit": "J", "ucd": "phys.energy;phys.atmol.level",
-                            "utype": "ssldm:Line.upperLevel.energy.value",
-                            "dataType": "real", "arraysize": "2"},
-    "EINSTEINA":           {"use": "optional", "std": "true",
-                            "description": "Einstein A coefficient range in s-1.",
-                            "unit": "1/s", "ucd": "phys.atmol.transProb",
-                            "utype": "ssldm:Line.probability.einsteinA",
-                            "dataType": "real", "arraysize": "2"},
-    "MAXREC":              {"use": "optional", "std": "true",
-                            "description": "Maximum number of records to return.",
-                            "dataType": "integer"},
-    "RESPONSEFORMAT":      {"use": "optional", "std": "true",
-                            "description": "MIME type of the response format. Supported: application/x-votable+xml, text/xml.",
-                            "dataType": "string"}
-}
-
-_SLAP2_SPECIES_METADATA = {
-    "SPECIES_TYPE":            {"use": "optional", "std": "true",
-                                "description": "Type of species: atom or molecule.",
-                                "dataType": "string"},
-    "INCHIKEY":                {"use": "optional", "std": "true",
-                                "description": "InChIKey identifier of the species (exact match).",
-                                "ucd": "phys.atmol.element",
-                                "dataType": "string"},
-    "INCHI":                   {"use": "optional", "std": "true",
-                                "description": "InChI identifier of the species (pattern matching).",
-                                "ucd": "phys.atmol.element",
-                                "dataType": "string"},
-    "NUMBER_OF_ATOMS":         {"use": "optional", "std": "true",
-                                "description": "Number of atoms in the species.",
-                                "dataType": "integer", "arraysize": "2"},
-    "SPECIES":                 {"use": "optional", "std": "true",
-                                "description": "Chemical name or structural formula (pattern matching).",
-                                "ucd": "phys.atmol.element",
-                                "dataType": "string"},
-    "STOICHIOMETRIC_FORMULA":  {"use": "optional", "std": "true",
-                                "description": "Stoichiometric formula of the species (pattern matching).",
-                                "ucd": "phys.atmol.element",
-                                "dataType": "string"},
-    "MAXREC":              {"use": "optional", "std": "true",
-                            "description": "Maximum number of records to return.",
-                            "dataType": "integer"},
-    "RESPONSEFORMAT":          {"use": "optional", "std": "true",
-                                "description": "MIME type of the response format. Supported: application/x-votable+xml, text/xml.",
-                                "dataType": "string"},
-}
-
-
-def _build_param_list(node_params, standard_metadata, always_include=("MAXREC", "RESPONSEFORMAT")):
+def _build_param_list(node_params, common_metadata, always_include=("MAXREC", "RESPONSEFORMAT")):
     """
     Build an ordered list of param dicts for a capabilities endpoint.
-    node_params: dict from dictionaries.py (params the node supports)
-    standard_metadata: standard SLAP2 metadata per param name
+    node_params: dict from dictionaries.py (params the node supports); standard
+        parameters carry their own SLAP2 capabilities metadata (use, std,
+        description, unit, dataType, ...) alongside the query-building keys.
+    common_metadata: metadata for params shared across endpoints but not
+        present in node_params (e.g. MAXREC, RESPONSEFORMAT)
     always_include: param names always present regardless of node_params
     """
     params = []
@@ -162,12 +62,18 @@ def _build_param_list(node_params, standard_metadata, always_include=("MAXREC", 
         if name in seen:
             continue
         seen.add(name)
-        meta = standard_metadata.get(name)
-        if meta is None:
-            node_info = node_params[name_key]
+        node_info = node_params[name_key]
+        if "std" in node_info:
+            meta = {"use": node_info.get("use", "optional"), "std": node_info["std"],
+                    "description": node_info.get("description", ""),
+                    "dataType": node_info.get("dataType", "string")}
+            for key in ("unit", "ucd", "utype", "arraysize"):
+                if node_info.get(key):
+                    meta[key] = node_info[key]
+        else:
             meta = {
                 "use": "optional", "std": "false",
-                "description": node_info.get("comment", ""),
+                "description": node_info.get("description", ""),
                 "dataType": "real" if node_info.get("isInterval") else "string",
             }
             if node_info.get("isInterval"):
@@ -175,7 +81,7 @@ def _build_param_list(node_params, standard_metadata, always_include=("MAXREC", 
         params.append({"name": name, **meta})
     for name in always_include:
         if name not in seen:
-            meta = standard_metadata.get(name, {"use": "optional", "std": "true", "dataType": "string"})
+            meta = common_metadata.get(name, {"use": "optional", "std": "true", "dataType": "string"})
             params.append({"name": name, **meta})
     return params
 
@@ -351,14 +257,22 @@ class SLAPQUERY(object):
             raise an exception if this is not the case
 
         """
-        slap_params = {k.upper(): v for k, v in request.GET.dict().items()}
-        log.debug('checkParameters')
-        log.debug(slap_params)
-
+        slap_params = request.GET.dict()
         # WAVELENGTH is mandatory in query
-        if "WAVELENGTH" not in slap_params :
+        if "WAVELENGTH" not in slap_params:
             raise Exception("WAVELENGTH parameter is missing in query")
+        
         for param in slap_params:
+            log.debug("### TEST")
+            log.debug(param)
+            log.debug(param not in LINES_PARAMETERS)
+            if param not in LINES_PARAMETERS and param not in COMMON_PARAMETERS :
+                raise Exception("Parameter {} is not supported".format(param))
+
+            param_info = LINES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
+            if len(request.GET.getlist(param)) > 1 and param_info.get("multiValued") is False :
+                raise Exception("Parameter {} has more than 1 value".format(param))
+
             # MAXREC is a DALI generic parameter handled at the framework level,
             # not in the node dictionary.
             if param == "MAXREC":
@@ -374,11 +288,7 @@ class SLAPQUERY(object):
                             f"Supported formats: {', '.join(sorted(accepted))}"
                         )
                     continue
-            # may be useful to have a distinction between the 2  cases
-            # if param in STANDARD_SLAP_LINES_PARAMETERS and param not in SLAP_SERVICE_LINES_PARAMETERS:
-            #    raise Exception("Parameter {} is not supported".format(param))
-            if param not in SLAP_SERVICE_LINES_PARAMETERS:
-                raise Exception("Parameter {} is not supported".format(param))
+
         return True
     
     def checkSlapSpeciesParameters(self, request):
@@ -391,18 +301,18 @@ class SLAPQUERY(object):
         (OR semantics per SLAP2 spec section 3.1).
         """
         raw_params = request.GET or request.POST
-        # Normalize keys to uppercase and aggregate multi-values
-        normalized = {}
-        for key in raw_params:
-            upper_key = key.upper()
-            if upper_key not in normalized:
-                normalized[upper_key] = []
-            normalized[upper_key].extend(raw_params.getlist(key))
-        slap_params = CaselessDict(normalized)
-        log.debug('checkSlapSpeciesParameters: %s', slap_params)
+        slap_params = raw_params
+        log.debug('checkSlapSpeciesParameters: %s', slap_params)        
         for param in slap_params:
-            if param not in STANDARD_SLAP_SPECIES_PARAMETERS:
+            if param not in SPECIES_PARAMETERS and param not in COMMON_PARAMETERS :
                 raise Exception("Parameter {} is not a valid SLAP /species parameter".format(param))
+
+            param_info = LINES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
+           
+            if len(raw_params.getlist(param)) > 1 and param_info.get('multiValued') is False : 
+                raise Exception("Parameter {} has more than 1 value".format(param))
+
+
             
             if param == "RESPONSEFORMAT":
                 responseformat = slap_params.get('RESPONSEFORMAT')
@@ -415,6 +325,7 @@ class SLAPQUERY(object):
                             f"Supported formats: {', '.join(sorted(accepted))}"
                         )
                     continue
+            
         self.species_params = slap_params
         return True
 
@@ -448,7 +359,7 @@ class SLAPQUERY(object):
         where = []
         # slap parameter names are case insensitive
         slap_params = request
-        for param, mapping in SLAP_SERVICE_LINES_PARAMETERS.items():
+        for param, mapping in LINES_PARAMETERS.items():
             restrictable = mapping.get('restrictable')
             convert_name = mapping.get('convert')
             is_interval = mapping.get('isInterval')
@@ -591,8 +502,8 @@ def capabilities(request):
     c = {
         "accessURL": getBaseURL(request, base="slap"),
         "slapStaticURL": slap_base + "static/",
-        "lines_params": _build_param_list(SLAP_SERVICE_LINES_PARAMETERS, _SLAP2_LINES_METADATA),
-        "species_params": _build_param_list(SLAP_SERVICE_SPECIES_PARAMETERS, _SLAP2_SPECIES_METADATA),
+        "lines_params": _build_param_list(LINES_PARAMETERS, COMMON_PARAMETERS),
+        "species_params": _build_param_list(SPECIES_PARAMETERS, COMMON_PARAMETERS),
     }
     return render(request, 'slap/capabilities.xml', c, content_type='text/xml')
 

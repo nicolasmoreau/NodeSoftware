@@ -343,10 +343,8 @@ def LinesTableFields():
     return result
 
 
-def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Methods=None, Functions=None,
-                Environments=None, Atoms=None, Molecules=None,
-                Solids=None, Particles=None, CollTrans=None, RadTrans=None,
-                RadCross=None, NonRadTrans=None, MAXREC=None):
+def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, 
+                Atoms=None, Molecules=None,MAXREC=None):
     """
     Return a VOTABLE containing the result of a select species request
     """
@@ -362,14 +360,14 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
             '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.5" '
             '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5 '
             'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"'
-            '\nxmlns:ssldm='
-            '"http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
+            '>\n'
             '\t<RESOURCE type="results">\n'
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n'
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
             '\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#species-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
+            f'\t\t<INFO name="service_ivoid" value="" />\n'
             f'\t\t<INFO name="publisher" value="" />\n'
             '\t<TABLE>\n'))
     
@@ -384,7 +382,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     yield(FIELD_TABS)
     yield (('<FIELD ' 
             ' name="ion_charge" datatype="int" '
-            ' ucd="phys.atmol.ionization"  />\n'))
+            ' ucd="phys.atmol.element;phys.atmol.ionization"  />\n'))
     
     yield(FIELD_TABS)
     yield (('<FIELD ' 
@@ -403,7 +401,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
     
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="species_stoichiometric_formula" datatype="char" ' 
+            ' name="stoichiometric_formula" datatype="char" ' 
             ' arraysize="*" />\n'))
     yield(FIELD_TABS)
     yield (('<FIELD '
@@ -432,8 +430,9 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None, Me
                 yield(TD_TABS)
                 yield(f'<TD>{G("AtomInchi")}</TD>\n')
                 yield(TD_TABS)
-                yield('<TD>NULL</TD>\n')
+                yield('<TD></TD>\n')
                 yield(TR_TABS)
+                yield('<TD>1</TD>\n')
                 yield('</TR>\n')
 
         if Molecules:
@@ -594,7 +593,7 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
         result.append(TD_TABS)
         result.append(f'<TD>{convertWavelength(G, 'RadTransWavelength')}</TD>\n')
         result.append(TD_TABS)
-        result.append(f'<TD>NULL</TD>\n')
+        result.append(f'<TD></TD>\n')
         line_title = []
         lower_ref = G('RadTransLowerStateRef')
         upper_ref = G('RadTransUpperStateRef')
@@ -606,13 +605,13 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
         result.append(f'<TD>{"".join(line_title)}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeChemicalName']}</TD>\n')
-        result.append(TD_TABS)
-        result.append(f'<TD>{states[lower_ref]['MoleculeMolecularWeight']}</TD>\n')
+        if fields['SPECIES_MASS']:
+            result.append(TD_TABS)
+            result.append(f'<TD>{states[lower_ref]['MoleculeMolecularWeight']}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeInchiKey']}</TD>\n')
         result.append(TD_TABS)
-        if fields['INCHI']:
-            result.append(f'<TD>{states[lower_ref]['MoleculeInchi']}</TD>\n')
+        result.append(f'<TD>{states[lower_ref]['MoleculeInchi']}</TD>\n')
         result.append(TD_TABS)
         result.append(f'<TD>{states[lower_ref]['MoleculeIonCharge']}</TD>\n')
         result.append(TD_TABS)
@@ -622,11 +621,12 @@ def TableMolecularTrs(RadTrans, states, fields, source_manager):
         if fields['EINSTEINA']:
             result.append(TD_TABS)
             result.append(f'<TD>{G('RadTransProbabilityA')}</TD>\n')
-
-        result.append(TD_TABS)
-        result.append(f'<TD>{states[lower_ref]['MoleculeStateEnergy']}</TD>\n')
-        result.append(TD_TABS)
-        result.append(f'<TD>{states[upper_ref]['MoleculeStateEnergy']}</TD>\n')        
+        if fields['LOWER_LEVEL_ENERGY']:
+            result.append(TD_TABS)
+            result.append(f'<TD>{states[lower_ref]['MoleculeStateEnergy']}</TD>\n')
+        if fields['UPPER_LEVEL_ENERGY']:
+            result.append(TD_TABS)
+            result.append(f'<TD>{states[upper_ref]['MoleculeStateEnergy']}</TD>\n')        
         result.extend(GetSourcesTds(G, source_manager))
         result.append(TR_TABS)
         result.append('</TR>\n')
@@ -769,20 +769,20 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     fields = LinesTableFields()
     returnables = RETURNABLES.keys()
 
-    yield ((f'<VOTABLE version="1.5" '
-            f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
-            f'xmlns="http://www.ivoa.net/xml/VOTable/v1.5"\n'
-            f'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5\n'
-            f'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"\n'
-            f'xmlns:ssldm="'
-            f'http://www.ivoa.net/xml/SimpleSpectralLineDM/v2.0">\n'
-            f'\t<RESOURCE type="results">\n' 
+    yield (('<VOTABLE version="1.5" '
+            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
+            'xmlns="http://www.ivoa.net/xml/VOTable/v1.5"\n'
+            'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5\n'
+            'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"\n'
+            '>\n'
+            '\t<RESOURCE type="results">\n' 
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
-            f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc)}" />\n'
+            f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
             f'\t\t<INFO name="query" value="{saxutils.escape(" ".join(TapQuery.split()), {'"': '&quot;'})}" />\n'
             f'\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#lines-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
+            f'\t\t<INFO name="service_ivoid" value="" />\n' 
             f'\t\t<INFO name="publisher" value="" />\n'))
     yield('\t\t')
     yield('<TABLE>\n')
@@ -799,8 +799,9 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="species_name" ' +
           ' datatype="char" arraysize="*"/>\n')
-    yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.mass" name="species_mass" ' +
+    if fields['SPECIES_MASS']:
+        yield(FIELD_TABS)
+        yield('<FIELD ucd="phys.mass" name="species_mass" ' +
           ' datatype="float"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element" name="inchikey" ' +
@@ -810,22 +811,24 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
           ' datatype="char" arraysize="*"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="phys.atmol.element;phys.atmol.ionization" name="ion_charge" ' +
-          ' datatype="int" />\n')
-    
+          ' datatype="int" />\n')    
     yield(FIELD_TABS)
     yield('<FIELD ucd="meta.title;phys.atmol.level" name="lower_level_description" ' +
           ' datatype="char" arraysize="*"/>\n')
     yield(FIELD_TABS)
     yield('<FIELD ucd="meta.title;phys.atmol.level" name="upper_level_description" ' +
           ' datatype="char" arraysize="*"/>\n')
-    yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.atmol.transProb" name="einstein_a" ' +
-          ' datatype="double" unit="1/s"/>\n')
-    yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.energy;phys.atmol.level" name="lower_level_energy" ' +
-          ' datatype="double" unit="J"/>\n')
-    yield(FIELD_TABS)
-    yield('<FIELD ucd="phys.energy;phys.atmol.level" name="upper_level_energy" ' +
+    if fields['EINSTEINA']:
+        yield(FIELD_TABS)
+        yield('<FIELD ucd="phys.atmol.transProb" name="einsteina" ' +
+          ' datatype="double" unit="s**-1"/>\n')
+    if fields['LOWER_LEVEL_ENERGY']:
+        yield(FIELD_TABS)
+        yield('<FIELD ucd="phys.energy;phys.atmol.level" name="lower_level_energy" ' +
+               ' datatype="double" unit="J"/>\n')
+    if fields['UPPER_LEVEL_ENERGY']:
+        yield(FIELD_TABS)
+        yield('<FIELD ucd="phys.energy;phys.atmol.level" name="upper_level_energy" ' +
           ' datatype="double" unit="J"/>\n')
 
     for i in range(source.sourceColumnCount):
