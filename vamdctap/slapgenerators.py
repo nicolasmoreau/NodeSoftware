@@ -357,14 +357,14 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None,
 
     yield (('<VOTABLE version="1.5" '
             '\nxmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
-            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.5" '
-            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5 '
-            'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"'
-            '>\n'
+            '\nxmlns="http://www.ivoa.net/xml/VOTable/v1.3" '
+            '\nxsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 '
+            'http://www.ivoa.net/xml/VOTable/votable-1.5.xsd">\n'
             '\t<RESOURCE type="results">\n'
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n'
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
+            f'\t\t<INFO name="service_ivoid" value="{getattr(settings, "SERVICE_IVOID", "")}"/>\n'
             '\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#species-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
             f'\t\t<INFO name="service_ivoid" value="" />\n'
@@ -376,7 +376,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None,
     yield(FIELD_TABS)
     yield (('<FIELD '
             'name="species_name" datatype="char" ' 
-            'arraysize="*" ucd="phys.atmol.element" >\n'))
+            'arraysize="*" ucd="phys.atmol.element" />\n'))
 
     #if fields['ION_CHARGE'] is True:
     yield(FIELD_TABS)
@@ -391,12 +391,12 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None,
     
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="inchikey" datatype="char" ' 
+            ' name="inchikey" datatype="char" ucd="phys.atmol.element" ' 
             ' arraysize="*" />\n'))
 
     yield(FIELD_TABS)
     yield (('<FIELD '
-            ' name="inchi" datatype="char" ' 
+            ' name="inchi" datatype="char" ucd="phys.atmol.element" ' 
             ' arraysize="*" />\n'))
     
     yield(FIELD_TABS)
@@ -769,16 +769,16 @@ def SlapLines(SlapQuery=None, TapQuery=None, HeaderInfo=None, Sources=None,
     fields = LinesTableFields()
     returnables = RETURNABLES.keys()
 
-    yield (('<VOTABLE version="1.5" '
-            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
-            'xmlns="http://www.ivoa.net/xml/VOTable/v1.5"\n'
-            'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.5\n'
-            'http://www.ivoa.net/xml/VOTable/VOTable-1.5.xsd"\n'
-            '>\n'
-            '\t<RESOURCE type="results">\n' 
+    yield ((f'<VOTABLE version="1.5" '
+            f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
+            f'xmlns="http://www.ivoa.net/xml/VOTable/v1.3"\n'
+            f'xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3\n'
+            f'http://www.ivoa.net/xml/VOTable/votable-1.5.xsd">\n'
+            f'\t<RESOURCE type="results">\n' 
             f'\t\t<INFO name="QUERY_STATUS" value="{getRequestStatus(MAXREC, HeaderInfo)}"/>\n' 
             f'\t\t<INFO name="request_date" value="{datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}" />\n'
             f'\t\t<INFO name="request" value="{saxutils.escape(SlapQuery)}" />\n'
+            f'\t\t<INFO name="service_ivoid" value="{getattr(settings, "SERVICE_IVOID", "")}"/>\n'
             f'\t\t<INFO name="query" value="{saxutils.escape(" ".join(TapQuery.split()), {'"': '&quot;'})}" />\n'
             f'\t\t<INFO name="service_protocol" value="ivo://ivoa.net/std/SLAP#lines-2.0" />\n' 
             f'\t\t<INFO name="last_update_date" value="{settings.LAST_MODIFIED}" />\n' 
