@@ -266,7 +266,7 @@ class SLAPQUERY(object):
                 raise Exception("Parameter {} is not supported".format(param))
 
             param_info = LINES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
-            if len(raw_params.getlist(param)) > 1 and param_info.get("multiValued") is False :
+            if len(slap_params.getlist(param)) > 1 and param_info.get("multiValued") is False :
                  raise Exception("Parameter {} has more than 1 value".format(param))
 
             # MAXREC is a DALI generic parameter handled at the framework level,
