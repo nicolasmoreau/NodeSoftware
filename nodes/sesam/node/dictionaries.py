@@ -257,14 +257,6 @@ SPECIES_ORM_FIELDS = {
 }
 
 # Dictionary of parameters in the SLAP species endpoint
-#
-#    "SPECIES_TYPE": {
-#           "restrictable": "FieldInSpeciesOrmFields",
-#           "type":"pattern|interval",
-#           # SLAP2 capabilities.xml metadata
-#           "use": "required|optional", "std": True,
-#           "description": "...", "dataType": "real|integer|string"
-#   }
 SLAP_SPECIES_PARAMETERS = {
     "SPECIES_TYPE":           { "restrictable": "SpeciesType",
                                 "type":"pattern",
