@@ -67,7 +67,7 @@ def _build_param_list(node_params, common_metadata, always_include=("MAXREC", "R
             meta = {"use": node_info.get("use", "optional"), "std": node_info["std"],
                     "description": node_info.get("description", ""),
                     "dataType": node_info.get("dataType", "string")}
-            for key in ("unit", "ucd", "utype", "arraysize"):
+            for key in ("unit", "ucd", "arraysize"):
                 if node_info.get(key):
                     meta[key] = node_info[key]
         else:
@@ -124,7 +124,6 @@ class SLAPQUERY(object):
         # self.token = request.token
         try :
             if request_type == SLAPQUERY.LINES_REQUEST : 
-                log.debug(request)
                 self.checkSlapLinesParameters(request)
             elif request_type == SLAPQUERY.SPECIES_REQUEST : 
                 self.checkSlapSpeciesParameters(request)
@@ -257,21 +256,18 @@ class SLAPQUERY(object):
             raise an exception if this is not the case
 
         """
-        slap_params = request.GET.dict()
+        slap_params = request.GET or request.POST # DALI requires GET and POST support
         # WAVELENGTH is mandatory in query
         if "WAVELENGTH" not in slap_params:
             raise Exception("WAVELENGTH parameter is missing in query")
-        
+
         for param in slap_params:
-            log.debug("### TEST")
-            log.debug(param)
-            log.debug(param not in LINES_PARAMETERS)
             if param not in LINES_PARAMETERS and param not in COMMON_PARAMETERS :
                 raise Exception("Parameter {} is not supported".format(param))
 
             param_info = LINES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
-            if len(request.GET.getlist(param)) > 1 and param_info.get("multiValued") is False :
-                raise Exception("Parameter {} has more than 1 value".format(param))
+            if len(raw_params.getlist(param)) > 1 and param_info.get("multiValued") is False :
+                 raise Exception("Parameter {} has more than 1 value".format(param))
 
             # MAXREC is a DALI generic parameter handled at the framework level,
             # not in the node dictionary.
@@ -300,32 +296,27 @@ class SLAPQUERY(object):
         of the same parameter (case-insensitively) are aggregated into a list
         (OR semantics per SLAP2 spec section 3.1).
         """
-        raw_params = request.GET or request.POST
-        slap_params = raw_params
-        log.debug('checkSlapSpeciesParameters: %s', slap_params)        
+        slap_params = request.GET or request.POST # DALI requires GET and POST support
         for param in slap_params:
             if param not in SPECIES_PARAMETERS and param not in COMMON_PARAMETERS :
                 raise Exception("Parameter {} is not a valid SLAP /species parameter".format(param))
 
-            param_info = LINES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
+            param_info = SPECIES_PARAMETERS.get(param) or COMMON_PARAMETERS.get(param) or {}
            
-            if len(raw_params.getlist(param)) > 1 and param_info.get('multiValued') is False : 
+            if len(request.GET.getlist(param)) > 1 and param_info.get('multiValued') is False : 
                 raise Exception("Parameter {} has more than 1 value".format(param))
-
-
             
             if param == "RESPONSEFORMAT":
-                responseformat = slap_params.get('RESPONSEFORMAT')
+                responseformat = unquote_plus(slap_params.get('RESPONSEFORMAT'))
                 if responseformat:
                     accepted = {'application/x-votable+xml', 'text/xml', 'votable'}
-                    responseformat_value = unquote_plus(responseformat[0]).lower()
-                    if responseformat_value not in accepted:
+                    if responseformat.lower() not in accepted:
                         raise Exception(
-                            f"RESPONSEFORMAT '{responseformat_value}' is not supported. "
+                            f"RESPONSEFORMAT '{responseformat}' is not supported. "
                             f"Supported formats: {', '.join(sorted(accepted))}"
                         )
                     continue
-            
+
         self.species_params = slap_params
         return True
 
@@ -436,7 +427,6 @@ def doSlapQuery(query, query_type):
         log.debug(traceback.format_exc())
         return slapServerError(status=400, errmsg=emsg)
     
-    log.debug("### querysets :" + str(querysets) )
     for q in querysets.values():
         log.debug(q)
 
