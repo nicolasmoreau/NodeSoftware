@@ -112,7 +112,6 @@ def getORMColumns(parameter):
     return result
 
 
-
 def filterSpecies(species_params, species):  
     """
         Return species, filtered by SLAP /species parameters if provided.
@@ -125,9 +124,9 @@ def filterSpecies(species_params, species):
         @rtype:   util_models.Result
         @return:  Result object
     """
-    for s in species_params:
-        # SPECIES: pattern matching on chemical name
-        param = species_params.get(s)
+    for s in species_params:        
+        # all values as list, even if there is only one
+        param = species_params.getlist(s)
         if param is not None and s in SLAP_SPECIES_PARAMETERS:
             normalize = SLAP_SPECIES_PARAMETERS[s].get('normalize')
             if normalize is not None:
