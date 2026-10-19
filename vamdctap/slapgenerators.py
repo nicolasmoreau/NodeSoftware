@@ -402,7 +402,7 @@ def SlapSpecies(SlapQuery=None, TapQuery=None, HeaderInfo=None,
     yield(FIELD_TABS)
     yield (('<FIELD '
             ' name="stoichiometric_formula" datatype="char" ' 
-            ' arraysize="*" />\n'))
+            ' arraysize="*" ucd="phys.atmol.element" />\n'))
     yield(FIELD_TABS)
     yield (('<FIELD '
             ' name="number_of_atoms" datatype="int" />\n'))
