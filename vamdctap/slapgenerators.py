@@ -30,19 +30,19 @@ TR_TABS = FIELD_TABS + '\t\t'
 TD_TABS = TR_TABS + '\t'
 
 
-# Helper function to test if an object is a list or tuple
-
-# isiterable = lambda obj: not isinstance(obj, six.string_types) \
-#                 and isinstance(obj, Iterable)
-
-
 def convertEnergy(G, keyword):
-    if G(keyword + "Unit") == "1/cm":
-        return invcm2J(G(keyword))
-    elif G(keyword + "Unit") == "Ry":
-        return Ry2J(G(keyword))
+    value = G(keyword)
+    unit = G(keyword + "Unit")
+    if value == '':
+        return ''
+    if unit in  ("1/cm", "cm**-1", "cm^-1"):
+        return invcm2J(value)
+    elif unit == "J":
+        return value
+    elif unit == "Ry":
+        return Ry2J(value)
     else:
-        raise Exception("Unknown energy unit")
+        raise Exception(f"Unknown energy unit : {unit}")
 
 
 def convertWavelength(G, keyword):
@@ -317,6 +317,10 @@ def LinesTableFields():
 
     dictionary = set(RETURNABLES.keys())
 
+    if len(list(set(['AtomMass', 'MoleculeMolecularWeight']) &
+                dictionary)) > 0:
+        result['SPECIES_MASS'] = True
+
     if len(list(set(['AtomSymbol', 'MoleculeChemicalName']) &
                 dictionary)) > 0:
         result['ELEMENT'] = True
@@ -324,6 +328,8 @@ def LinesTableFields():
     if len(list(set(['AtomInchi', 'MoleculeInchi']) &
                 dictionary)) > 0:
         result['INCHI'] = True
+
+
 
     if 'AtomStateConfigurationLabel' in dictionary:
         result['CONFIGURATION'] = True
@@ -336,6 +342,14 @@ def LinesTableFields():
 
     if 'RadTransProbabilityA' in dictionary:
         result['EINSTEINA'] = True
+
+    if 'MoleculeStateEnergy' in dictionary:
+        result['LOWER_LEVEL_ENERGY'] = True
+        result['UPPER_LEVEL_ENERGY'] = True
+
+    if 'AtomStateEnergy' in dictionary:
+        result['LOWER_LEVEL_ENERGY'] = True
+        result['UPPER_LEVEL_ENERGY'] = True
 
     if(len(GetMolecularQuantumNumbers())) > 0:
         result['MOLECULARQNS'] = True
@@ -489,7 +503,8 @@ def GetMolecularStates(Molecules):
                 state['MoleculeInchi'] = H('MoleculeInchi')
                 state['MoleculeMolecularWeight'] = H('MoleculeMolecularWeight')
                 state['MoleculeStateDescription'] = G('MoleculeStateDescription')
-                state['MoleculeStateEnergy'] = convertEnergy(G, 'MoleculeStateEnergy')
+                if 'MoleculeStateEnergy' in RETURNABLES:
+                    state['MoleculeStateEnergy'] = convertEnergy(G, 'MoleculeStateEnergy')
 
                 qns = GetMolecularQuantumNumbers()
                 qn_label_string = ""
@@ -526,15 +541,20 @@ def GetAtomicStates(Atoms):
                     state['AtomStateEnergy'] = \
                         convertEnergy(G, 'AtomStateEnergy')
                 state['AtomSymbol'] = H('AtomSymbol')
-                state['AtomIonCharge'] = H('AtomIonCharge')
+                if H('AtomIonCharge') != '':
+                    state['AtomIonCharge'] = H('AtomIonCharge')
+                else:
+                    state['AtomIonCharge'] = 0
                 state['AtomInchiKey'] = H('AtomInchiKey')
+                state['AtomInchi'] = H('AtomInchi')
+                state['AtomMass'] = H('AtomMass')
 
                 configuration = []
                 term = []
 
                 for Component in makeiter(State.Components):
                     configuration.append(I('AtomStateConfigurationLabel'))
-                    configuration.append(I('AtomStateTermLabel'))
+                    term.append(I('AtomStateTermLabel'))
 
                 state['AtomStateConfigurationLabel'] = ' '.join(configuration)
                 state['AtomStateTermLabel'] = ' '.join(term)
@@ -642,98 +662,48 @@ def TableAtomicTrs(RadTrans, states, fields, source_manager):
     result = []
     G = lambda name: GetValue(name, RadTran=RadTran)
     for RadTran in RadTrans:
+        lower_ref = G('RadTransLowerStateRef')
+        upper_ref = G('RadTransUpperStateRef')
         result.append(TR_TABS)
         result.append('<TR>\n')
-        if fields['WAVELENGTH']:
-            result.append(TD_TABS)
-            result.append(f'<TD>{convertWavelength(G, 'RadTransWavelength')}</TD>\n')
-        else:
-            # problematic case, how to manage all possible units ?
-            # most cases handled with nm and A
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (G('RadTransWavelength')))
-
-        line_title = []
-
-        if fields['ELEMENT']:
-            line_title.append(states[G('RadTransLowerStateRef')]['AtomSymbol'])
-            line_title.append(states[G('RadTransUpperStateRef')]['AtomSymbol'])
-
-        if fields['IONCHARGE']:
-            line_title.append(" lower level ion charge : %s" %
-                              states[G('RadTransLowerStateRef')]
-                                    ['AtomIonCharge'])
-            line_title.append(" upper level ion charge : %s" %
-                              states[G('RadTransUpperStateRef')]
-                                    ['AtomIonCharge'])
-        else:
-            line_title.append(" lower level ion charge : 0")
-            line_title.append(" upper level ion charge : 0")           
-            
-
-        if fields['ENERGY']:
-            line_title.append(' Upper energy : %s , Lower energy : %s' %
-                              (states[G('RadTransUpperStateRef')]
-                                     ['AtomStateEnergy'],
-                               states[G('RadTransLowerStateRef')]
-                                     ['AtomStateEnergy']))
         result.append(TD_TABS)
-        result.append('<TD>%s</TD>\n' % (''.join(line_title)))
-
-        if fields['ENERGY']:
+        result.append(f'<TD>{convertWavelength(G, 'RadTransWavelength')}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD></TD>\n')
+        result.append(TD_TABS)
+        descriptions = [
+            (f'{states[ref]['AtomStateConfigurationLabel']} '
+             f'{states[ref]['AtomStateTermLabel']}').strip()
+            for ref in (lower_ref, upper_ref)]
+        line_title = (f'{states[lower_ref]['AtomSymbol']} '
+                      f'ion charge : {states[lower_ref]['AtomIonCharge']} '
+                      f'{descriptions[0]} -> {descriptions[1]}')
+        result.append(f'<TD>{line_title}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['AtomSymbol']}</TD>\n')
+        if fields['SPECIES_MASS']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['AtomStateEnergy']))
+            result.append(f'<TD>{states[lower_ref]['AtomMass']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['AtomInchiKey']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['AtomInchi']}</TD>\n')
+        result.append(TD_TABS)
+        result.append(f'<TD>{states[lower_ref]['AtomIonCharge']}</TD>\n')
+        for ref in (lower_ref, upper_ref):
+            description = (f'{states[ref]['AtomStateConfigurationLabel']} '
+                           f'{states[ref]['AtomStateTermLabel']}').strip()
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['AtomStateEnergy']))
-
-        if fields['CONFIGURATION'] or \
-           fields['TERM'] or \
-           fields['STATE_DESCRIPTION']:
-            result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>\n' %
-                          ((states[G('RadTransLowerStateRef')]
-                                  ['AtomStateConfigurationLabel']),
-                           states[G('RadTransLowerStateRef')]
-                                 ['AtomStateTermLabel']))
-            result.append(TD_TABS)
-            result.append('<TD>%s %s</TD>\n' %
-                          ((states[G('RadTransUpperStateRef')]
-                                  ['AtomStateConfigurationLabel']),
-                           states[G('RadTransUpperStateRef')]
-                                 ['AtomStateTermLabel']))
-
+            result.append(f'<TD>{description}</TD>\n')
         if fields['EINSTEINA']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' % (G('RadTransProbabilityA')))
-
-        if fields['ELEMENT']:
+            result.append(f'<TD>{G('RadTransProbabilityA')}</TD>\n')
+        if fields['LOWER_LEVEL_ENERGY']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]['AtomSymbol']))
-
-        if fields['IONCHARGE']:
+            result.append(f'<TD>{states[lower_ref]['AtomStateEnergy']}</TD>\n')
+        if fields['UPPER_LEVEL_ENERGY']:
             result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransLowerStateRef')]
-                                 ['AtomIonCharge']))
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['AtomIonCharge']))
-        else:
-            result.append(TD_TABS)
-            result.append('<TD>0</TD>\n')
-            result.append('<TD>0</TD>\n')
-            
-        if fields['INCHIKEY']:
-            result.append(TD_TABS)
-            result.append('<TD>%s</TD>\n' %
-                          (states[G('RadTransUpperStateRef')]
-                                 ['AtomInchiKey']))
+            result.append(f'<TD>{states[upper_ref]['AtomStateEnergy']}</TD>\n')
 
         result.extend(GetSourcesTds(G, source_manager))
         result.append(TR_TABS)
