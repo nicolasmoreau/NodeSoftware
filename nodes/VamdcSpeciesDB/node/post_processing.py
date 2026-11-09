@@ -79,7 +79,13 @@ def fix_species_values():
     """
     db_molecule = VamdcSpecies.objects.filter(mass_number=0)
     for mol in db_molecule:
-        inchiinfo = InchiInfo(update.get_clean_inchi(mol.inchi))
-        mol.inchi = update.get_clean_inchi(mol.inchi)
+        try:
+            clean_inchi = update.get_clean_inchi(mol.inchi)
+        except ValueError as e:
+            # skip this species, keep fixing the others
+            print("Unable to fix species %s : %s" % (mol.id, e))
+            continue
+        inchiinfo = InchiInfo(clean_inchi)
+        mol.inchi = clean_inchi
         mol.mass_number = update.get_species_mass(0, inchiinfo)
         mol.save(update_fields=["mass_number", "inchi"])

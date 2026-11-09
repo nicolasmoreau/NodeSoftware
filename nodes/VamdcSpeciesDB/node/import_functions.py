@@ -3,6 +3,7 @@
 #
 from datetime import datetime
 from copy import copy
+from django.db import transaction
 from node.models import *
 import vamdclib.query     as vl_query
 import vamdclib.results   as vl_results
@@ -22,14 +23,22 @@ def get_clean_inchi(inchi):
         inchi : string
                 a molecule inchi
 
-    returns : 
+    returns :
         inchi prefixed by InChI=
 
+    raises :
+        ValueError if the result is not a valid InChI string (InChI=1...)
+
     """
+    inchi = inchi.strip()
     if inchi[0:6] != "InChI=":
-        return "InChI="+inchi.strip()
+        result = "InChI="+inchi
     else:
-        return "InChI="+inchi[6:].strip()
+        result = "InChI="+inchi[6:].strip()
+
+    if not result.startswith("InChI=1"):
+        raise ValueError("Invalid InChI {}".format(inchi))
+    return result
     
 def get_species_mass(speciesWeight, inchiinfo):
     """ Returns the mass of a species
@@ -86,11 +95,12 @@ def update_nodes():
     for node in nodelist:
         db_node, created = VamdcNodes.objects.get_or_create(ivo_identifier=node.identifier)
         if created:
-            print("Adding new node %s %s nn %s nu %s em"%(node.identifier, node.name, 
-                                                          node.url, node.maintainer))            
+            print("Adding new node %s %s nn %s nu %s em"%(node.identifier, node.name,
+                                                          node.url, node.maintainer))
             db_node.short_name = node.name
             db_node.contact_email = node.maintainer
             db_node.reference_url = node.referenceUrl
+            db_node.tap_endpoint = node.url if hasattr(node, 'url') and node.url else ''
             db_node.status = RecordStatus.NEW
             db_node.update_status = UpdateStatus.NEW
             db_node.last_update_date = nowtime
@@ -100,6 +110,7 @@ def update_nodes():
           if db_node.update_status == 1 :
             print("Updating the node information for %s" % db_node.short_name)
             db_node.contact_email = node.maintainer
+            db_node.tap_endpoint = node.url if hasattr(node, 'url') and node.url else db_node.tap_endpoint
             db_node.last_update_date = nowtime
             #~ set_node_topics(db_node, node)
         db_node.save()
@@ -160,10 +171,7 @@ def load_species(vl_node):
     for atomid in vl_atoms:
         vl_atom = vl_atoms[atomid]
         try:
-            verify_atom(vl_atom)
-            db_atom = update_atom(vl_atom, db_node)
-            species_name = update_atom_names(db_atom)
-            update_species_in_node(db_node, db_atom, vl_atom, species_name, vl_atom.OriginalMassNumber)
+            load_atom(db_node, vl_atom)
         except Exception as e:
             print("Failed to load atom:", e)
             pprint(vl_atom)
@@ -172,19 +180,49 @@ def load_species(vl_node):
     # Update or insert the molecules
     for moleculeid in vl_molecules:
         vl_molecule = vl_molecules[moleculeid]
-        try:            
-            vl_molecule = verify_molecule(vl_molecule)
-            db_molecule = update_molecule(vl_molecule, db_node)
-            species_name = update_molecule_names(db_molecule, vl_molecule)
-            species_formula = update_structural_formula(db_molecule, 
-                                                        vl_molecule.OrdinaryStructuralFormula)
-            update_species_in_node(db_node, db_molecule, vl_molecule, 
-                                   species_name, vl_molecule.OriginalMolecularWeight, 
-                                   species_formula)
-        except  Exception as e:
+        try:
+            load_molecule(db_node, vl_molecule)
+        except Exception as e:
             print("Failed to load molecule:", e)
             pprint(vl_molecule)
             traceback.print_exc(file=sys.stdout)
+
+
+# Each species is loaded in a transaction : if a step fails, nothing is written.
+# Otherwise the species could be recorded in vamdc_species without any
+# vamdc_node_species row, and would never be visible in the search table.
+
+@transaction.atomic
+def load_atom(db_node, vl_atom):
+    """ Insert or update an atom and its link to the node """
+    verify_atom(vl_atom)
+    db_atom = update_atom(vl_atom, db_node)
+    species_name = update_atom_names(db_atom)
+    update_species_in_node(db_node, db_atom, vl_atom, species_name,
+                           get_node_mass(vl_atom.OriginalMassNumber, vl_atom.MassNumber))
+
+
+@transaction.atomic
+def load_molecule(db_node, vl_molecule):
+    """ Insert or update a molecule and its link to the node """
+    vl_molecule = verify_molecule(vl_molecule)
+    db_molecule = update_molecule(vl_molecule, db_node)
+    species_name = update_molecule_names(db_molecule, vl_molecule)
+    # some nodes (e.g. VALD) do not provide any structural formula
+    species_formula = update_structural_formula(
+        db_molecule, getattr(vl_molecule, "OrdinaryStructuralFormula", None))
+    update_species_in_node(db_node, db_molecule, vl_molecule, species_name,
+                           get_node_mass(vl_molecule.OriginalMolecularWeight,
+                                         vl_molecule.MolecularWeight),
+                           species_formula)
+
+
+def get_node_mass(original_mass, computed_mass):
+    """ Mass recorded for the species in the node : the value provided by the node,
+        or the value computed from the inchi when the node does not provide one
+        (vamdc_node_species.member_database_mass_number can not be NULL)
+    """
+    return original_mass if original_mass is not None else computed_mass
 
 
 def update_structural_formula(db_molecule, formula, checkonly = False):
@@ -202,6 +240,10 @@ def update_structural_formula(db_molecule, formula, checkonly = False):
 
 
     """
+    # No formula provided by the node : nothing to record
+    if formula is None or formula.strip() == "":
+        return None
+
     # Check if it is already in the species-database
     structformulae = VamdcSpeciesStructFormulae.objects.filter(species = db_molecule.id, 
                                                                formula = formula)
@@ -236,9 +278,9 @@ def update_structural_formula(db_molecule, formula, checkonly = False):
       if len(structformulae) == 1:
         return structformulae.first()
       else:
-        #raise Exception("error")
-        print("ERROR : struct formula size : %s" % len(structformulae))
-        sys.exit()
+        # do not sys.exit() here : it would stop the whole import
+        raise ValueError("%s struct formulae '%s' found for species %s"
+                         % (len(structformulae), formula, db_molecule.id))
 
 
 def verify_atom(vl_atom):
@@ -267,10 +309,12 @@ def verify_atom(vl_atom):
             raise ValueError("Atom '%s' not found in the atoms dictionary." % symbol)
     except:
         raise ValueError("Atom '%s' not found in the atoms dictionary." % symbol)
-    
 
-    try:        
-        inchiinfo = InchiInfo(vl_atom.InChI)     
+    # raises ValueError before anything is written if the inchi is invalid
+    vl_atom.InChI = get_clean_inchi(vl_atom.InChI)
+
+    try:
+        inchiinfo = InchiInfo(vl_atom.InChI)
     except:
         print ("Unable to load the inchi information for atom '%s'" % vl_atom.ChemicalElementSymbol )
         traceback.print_exc(file=sys.stdout)
@@ -550,8 +594,7 @@ def update_molecule_names(db_molecule, vl_molecule):
 
     return db_speciesname
 
-
-def update_species_in_node(db_node, db_species, vl_species, species_name, 
+def update_species_in_node(db_node, db_species, vl_species, species_name,
                            mass_number, species_formula=None):
     """
     Insert or update the information for a species record in a given node (VamdcNodeSpecies)
@@ -572,12 +615,11 @@ def update_species_in_node(db_node, db_species, vl_species, species_name,
         )
 
     if not created:
+        # species seen again : refresh date and reactivate it if it had been
+        # marked as deprecated by check_deprecated_species()
         db_nodeSpecies.last_seen_dateTime = datetime.now()
-        db_nodeSpecies.save()
-
-    if created:
         db_nodeSpecies.deprecated = False
-        db_nodeSpecies.save()
+        db_nodeSpecies.save(update_fields=["last_seen_dateTime", "deprecated"])
 
 
 def get_species(vl_node):

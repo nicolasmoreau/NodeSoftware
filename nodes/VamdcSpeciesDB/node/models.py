@@ -87,6 +87,7 @@ class VamdcNodes(models.Model):
   contact_email = models.CharField(max_length = 100, blank = False)
   ivo_identifier = models.CharField(max_length = 100, blank = False, unique=True)
   reference_url = models.CharField(max_length = 100, blank = True)
+  tap_endpoint = models.CharField(max_length = 255, blank = False, default='')
   status = models.IntegerField(default=RecordStatus.NEW, blank = False, choices=RecordStatus.RECORD_STATUS_CHOICES)
   update_status = models.IntegerField(default=UpdateStatus.NEW, blank = False, choices=UpdateStatus.UPDATE_STATUS_CHOICES)
   last_update_date = models.DateTimeField(auto_now = False, editable=False, default = datetime.now)

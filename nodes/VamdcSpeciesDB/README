@@ -5,7 +5,92 @@ README
 The VAMDC Species Database node,
 
 Data ingestion cron job script:
-python2 node/cronjob.py
+update_content.sh, which runs node/cronjob.py (python 3, django environment)
+then restarts the species service (server/server.py).
+
+
+
+Data ingestion
+--------------
+
+node/cronjob.py runs the following steps:
+
+1. update_nodes()             : read the VAMDC registry, add new nodes and update
+                                the existing ones (vamdc_nodes)
+2. query_active_nodes()       : for each node with update_status = active, send a
+                                "SELECT Species" request and load the atoms and
+                                molecules it returns
+3. check_deprecated_species() : mark as deprecated the species not returned by a
+                                node for more than 45 days
+4. fill_search_table()        : empty and refill vamdc_merged_fields_vals, the table
+                                used by the species service for searches
+
+Each species returned by a node is loaded by load_atom() / load_molecule()
+(node/import_functions.py) :
+
+    verify  ->  vamdc_species  ->  vamdc_species_names  ->  vamdc_species_struct_formulae
+            ->  vamdc_node_species
+
+Rules applied during the import :
+
+- Each species is loaded in a single transaction : if any step fails, nothing
+  is written for this species, the error is printed and the import continues
+  with the next one. This requires InnoDB tables (no transaction with MyISAM).
+
+- InChI : get_clean_inchi() adds the "InChI=" prefix if missing and strips
+  spaces. A species whose InChI does not start with "InChI=1" is rejected
+  (ValueError) before anything is written.
+
+- Missing structural formula (OrdinaryStructuralFormula, e.g. VALD molecules) :
+  accepted, vamdc_node_species.database_species_formula is left NULL.
+
+- Missing mass (MolecularWeight / MassNumber) : the mass computed from the InChI
+  by OpenBabel is used, in vamdc_species.mass_number and in
+  vamdc_node_species.member_database_mass_number (which can not be NULL).
+
+- Deprecation : a vamdc_node_species row is deprecated when the species has not
+  been seen for 45 days after the last node update. It is reactivated
+  (deprecated = 0) as soon as the node returns the species again.
+
+- Search table : only species having at least one vamdc_node_species row with
+  deprecated = 0 are added to vamdc_merged_fields_vals. A species that is in
+  vamdc_species but not in this table can not be found on the web site.
+
+
+
+Debugging the import of a species
+---------------------------------
+
+node/debug_species.py replays the import of a single species from a node, using
+the same functions as the cron job. It prints the data returned by the node,
+the vamdc_node_species row that would be created, or the error that occurred.
+All database changes are rolled back at the end (InnoDB only).
+
+    cd /home/vamdc/NodeSoftware/nodes/VamdcSpeciesDB
+    DJANGO_SETTINGS_MODULE=settings \
+        /home/vamdc/miniconda3/envs/django3.1/bin/python3 \
+        node/debug_species.py <inchikey> [<node ivo identifier>]
+
+    example :
+        ... node/debug_species.py APKBIZXUJLWQRU-UHFFFAOYSA-N ivo://vamdc/vald/uu/all
+
+The node identifier defaults to ivo://vamdc/vald/uu/all (VALD).
+
+Useful queries :
+
+    -- species without any link to a node (never visible on the web site)
+    SELECT vs.id, vs.inchi, vs.stoichiometric_formula
+    FROM vamdc_species vs
+    LEFT JOIN vamdc_node_species vns ON vns.species_id = vs.id
+    WHERE vns.id IS NULL;
+
+    -- links between a species and the nodes
+    SELECT vn.short_name, vn.status, vns.deprecated,
+           vns.last_seen_dateTime, vn.last_update_date
+    FROM vamdc_species vs
+    JOIN vamdc_node_species vns ON vns.species_id = vs.id
+    JOIN vamdc_nodes vn ON vn.id = vns.member_database_id
+    WHERE vs.inchikey = '<inchikey>';
 
 
 
@@ -16,6 +101,3 @@ Once the export model is changed, please remove export/migrations contents and r
     ./manage.py makemigrations export to recreate the exported data model.
 
 The data is exported into speciesdb.sqlite
-
-
-
