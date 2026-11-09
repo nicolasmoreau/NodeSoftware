@@ -9,6 +9,10 @@ Without it, SQLite picks the low-cardinality wave_method index over the wave ran
 MethodCategory query scans tens of millions of rows. PRAGMA analysis_limit sampling gives
 useless stats here, so do not use it.
 
+species.has_transitions is set at the end of the states/transitions import; SELECT SPECIES returns only
+those (358 of 1126 locally), so empty VALD species list entries are not advertised to the VAMDC registry.
+DBs imported before the flag existed: sqlite3 <db> < scripts/add_has_transitions.sql (instant).
+
 # Import of data via valdimport.py
 
 ## to make a new dev database from scratch

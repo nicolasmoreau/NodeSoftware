@@ -1378,7 +1378,33 @@ def import_transitions(input_file=None, batch_size=10000, skip_header=2,
         if verbose:
             print('Einstein A calculated')
 
+    update_species_flags(verbose)
     return total_processed
+
+
+def update_species_flags(verbose=True):
+    """Set ground_state_id and has_transitions for all species after a states/transitions import."""
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE species
+            SET ground_state_id = (
+                SELECT id FROM states
+                WHERE states.species_id = species.id
+                ORDER BY states.energy ASC
+                LIMIT 1
+            )
+        """)
+        cursor.execute("""
+            UPDATE species
+            SET has_transitions = EXISTS (
+                SELECT 1 FROM transitions WHERE transitions.species_id = species.id
+            )
+        """)
+        cursor.execute("SELECT COUNT(*) FROM species WHERE has_transitions")
+        n = cursor.fetchone()[0]
+    if verbose:
+        print(f'Ground states set; {n} species have transitions')
 
 
 def import_states_transitions(input_file=None, batch_size=10000, skip_header=2,
@@ -1708,25 +1734,7 @@ def import_states_transitions(input_file=None, batch_size=10000, skip_header=2,
         if verbose:
             print('Einstein A calculated')
 
-    # Update ground_state_id for all species
-    if verbose:
-        print('Setting ground state references...')
-
-    with connection.cursor() as cursor:
-        # For each species, find the state with minimum energy and set it as ground_state_id
-        cursor.execute("""
-            UPDATE species
-            SET ground_state_id = (
-                SELECT id FROM states
-                WHERE states.species_id = species.id
-                ORDER BY states.energy ASC
-                LIMIT 1
-            )
-        """)
-
-    if verbose:
-        updated = cursor.rowcount if hasattr(cursor, 'rowcount') else 'N/A'
-        print(f'Ground state references set (updated {updated} species)')
+    update_species_flags(verbose)
 
     return total_processed, total_states_inserted, total_transitions_inserted
 

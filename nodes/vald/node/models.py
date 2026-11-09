@@ -51,6 +51,8 @@ class Species(Model):
     atomic = PositiveSmallIntegerField(null=True, db_index=True)
     isotope = PositiveSmallIntegerField(null=True)
     ground_state_id = IntegerField(null=True, db_index=True)  # ID of ground state (lowest energy)
+    # set after import; SELECT SPECIES advertises only species with lines in this DB
+    has_transitions = BooleanField(default=False, db_index=True)
 
     components = ManyToManyField('self',through='SpeciesComp', symmetrical=False)
 

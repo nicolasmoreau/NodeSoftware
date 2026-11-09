@@ -68,7 +68,7 @@ def setupResults(sql):
     log.debug('%s\n%s'%(sql.parsedSQL.columns,type(sql.where)))
     if (len(sql.parsedSQL.columns) == 1) and (sql.where == ''):
         log.debug('Special case of "select species"')
-        all_species = Species.objects.all()
+        all_species = Species.objects.filter(has_transitions=True)
         atoms_list = [s for s in all_species if not s.isMolecule()]
         molecules_list = [s for s in all_species if s.isMolecule()]
         return {'Atoms': atoms_list,
